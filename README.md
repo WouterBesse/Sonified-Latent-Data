@@ -4,6 +4,7 @@
 This repository is made to assist my university thesis about sonifying the latent space. We couple a WaveNet + VAE similar to [[Chorowski et al., 2019]](https://arxiv.org/abs/1901.08810) with latent distrubitions generated from multiple different dataset-encoder couples. 
 
 The goal is to discover if the sonified audio results contains meaningfull differences and features from the input datasets.
+A lot of earlier experiments relevant to this project I tried using the WaveNet decoder can be found in my [denoising repository](https://github.com/WouterBesse/ConvDenoiser).
 
 ## How To Use
 
