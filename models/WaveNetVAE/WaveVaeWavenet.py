@@ -12,7 +12,7 @@ class Wavenet(nn.Module):
                  out_channels = 256, 
                  res_channels = 512, 
                  skip_channels = 512, 
-                 gate_channels = 512, 
+                 gate_channels = 1024, 
                  cond_channels = -1, 
                  kernel_size = 3, 
                  freq_axis_kernel_size = 3, 
@@ -55,7 +55,6 @@ class Wavenet(nn.Module):
                     cin_channels = cond_channels,
                     dilation = new_dilation,
                     dropout = dropout,
-                    weight_normalisation = True,
                 )
                 self.conv_layers.append(resdilconv)
 
