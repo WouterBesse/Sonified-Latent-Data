@@ -2,10 +2,6 @@ import torch
 from torch import nn
 import numpy as np
 import math
-from typing import Callable, Optional, Sequence, Tuple, Union
-from torch import Tensor
-from torchaudio.transforms import AmplitudeToDB, MelSpectrogram
-from torchaudio import functional as F
 
 """
 Util functions
@@ -21,11 +17,9 @@ def normalisedConvTranspose2d(in_channels, out_channels, kernel_size,
     else:
         return m
     
-
 """
 Torch Modules
 """
-
 class Jitter(nn.Module):
     """
     Jitter implementation from [Chorowski et al., 2019].

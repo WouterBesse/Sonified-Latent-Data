@@ -148,7 +148,6 @@ class Encoder(nn.Module):
                                 zsize * 2,
                                 kernel_size = 1,
                                 bias = False)
-        # self.flatten = WOP.Flatten()
 
 
     def forward(self, x):
