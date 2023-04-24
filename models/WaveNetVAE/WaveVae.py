@@ -68,7 +68,7 @@ class Decoder(nn.Module):
         """
         cond = self.linear(cond)
         condition = cond.view(xsize)
-        
+
         if self.use_jitter and jitter:
             condition = self.jitter(condition)
         # print(x.size())
@@ -87,28 +87,62 @@ class Encoder(nn.Module):
         super().__init__()
 
         features, timesteps = input_size
-        self.prenet = nn.Conv1d(features, hidden_dim, kernel_size = 3, padding='same')
-        self.preconv = nn.Conv1d(features, hidden_dim, kernel_size = 3, padding='same')
-        self.ReL = nn.ReLU()
-        self.batchnorm = nn.BatchNorm1d(hidden_dim)
-        self.ReLu = nn.Sequential(
-            nn.LeakyReLU(negative_slope=0.1, inplace=True),
-            # nn.BatchNorm1d(hidden_dim)
-        )
         self.zsize = zsize
+        self.ReL = nn.ReLU()
 
-        self.downsample = nn.Conv1d(hidden_dim, hidden_dim, kernel_size = 4, stride = 2, padding = 1)
+        """
+        Preprocessing convolutions with residual connections
+        """
+        self.conv_1 = nn.Conv1d(features, 
+                                hidden_dim, 
+                                kernel_size = 3, 
+                                padding='same')
         
+        self.conv_2 = nn.Conv1d(features, 
+                                hidden_dim, 
+                                kernel_size = 3, 
+                                padding='same')
+
+        """
+        Downsample in the time axis by a factor of 2
+        """
+        self.downsample = nn.Conv1d(hidden_dim, 
+                                    hidden_dim, 
+                                    kernel_size = 4, 
+                                    stride = 2, 
+                                    padding = 2)
+        
+
+        """
+        Residual convs
+        """
         self.resblocks = nn.ModuleList()
         for _ in range(resblocks):
-            self.resblocks.append(nn.Conv1d(hidden_dim, hidden_dim, kernel_size = 3, padding='same'))
+            self.resblocks.append(
+                nn.Conv1d(hidden_dim, 
+                          hidden_dim, 
+                          kernel_size = 3, 
+                          padding = 1))
 
+        """
+        Relu blocks
+        """
         self.relublocks = nn.ModuleList()
         for _ in range(relublocks):
-            self.relublocks.append(nn.Conv1d(hidden_dim, hidden_dim, kernel_size = 3, padding='same'))
+            self.relublocks.append(
+                nn.Sequential(
+                    nn.Conv1d(hidden_dim, 
+                              hidden_dim, 
+                              kernel_size = 3, 
+                              padding = 1),
+                    nn.ReLU(True),
+                    nn.Conv1d(hidden_dim, 
+                              hidden_dim, 
+                              kernel_size = 3, 
+                              padding = 1),
+                    nn.ReLU(True)))
 
         self.linear = nn.Linear(int(timesteps // 2 * hidden_dim), int(zsize))
-        # print(WOP.dimensionSize(timesteps, 2) * hidden_dim)
         self.flatton = WOP.Flatten()
 
 
@@ -121,29 +155,26 @@ class Encoder(nn.Module):
             zcomb[:, self.zsize:] (Tensor): Latent space variance, shape (B x zsize)
             x_size (Tuple): Size of condition before flattening, shape (B x hidden_dim x timesteps)
         """
-        # Preprocessing conv with residual connections
-        net = self.prenet(x)
-        conv = self.preconv(x)
-        x = self.ReL(net) + self.ReL(conv)
-        # x = self.batchnorm(x)
-        
-        
 
+        net = self.conv_1(x)
+        conv = self.conv_2(x)
+        x = self.ReL(net) + self.ReL(conv)
+        
         # Downsample
-        x = self.ReLu(self.downsample(x))
+        x = self.ReL(self.downsample(x))
 
         # Residual convs
         for resblock in self.resblocks:
-            xres = self.ReLu(resblock(x))
+            xres = self.ReL(resblock(x))
             x = xres + x
 
         # Relu blocks
         for relblock in self.relublocks:
-            xrelu = self.ReLu(relblock(x))
-            x = xrelu + xrelu
+            xrelu = relblock(x)
+            x = x + xrelu
+        x = self.Rel(x)
 
         # Flatten into latent space
-        # self.
         x_size = x.size()
 
         flatx = self.flatton(x)
