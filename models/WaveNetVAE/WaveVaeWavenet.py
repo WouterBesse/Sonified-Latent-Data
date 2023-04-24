@@ -7,7 +7,7 @@ import models.WaveNetVAE.WaveVaeOperations as WOP
 class Wavenet(nn.Module):
 
     def __init__(self, 
-                 layers = 1, 
+                 layers = 10, 
                  stacks = 2, 
                  out_channels = 256, 
                  res_channels = 512, 

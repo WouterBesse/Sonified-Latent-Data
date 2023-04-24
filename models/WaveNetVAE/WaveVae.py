@@ -5,8 +5,8 @@ from torch.utils.data import Dataset
 from torchaudio.transforms import MuLawEncoding, MFCC, Resample
 import torchaudio.functional as AF
 import torchaudio
-import models.VAEWavenet.WaveVaeOperations as WOP
-import models.VAEWavenet.WaveVaeWavenet as WaveNet
+import models.WaveNetVAE.WaveVaeOperations as WOP
+from models.WaveNetVAE.WaveVaeWavenet import Wavenet
 from tqdm import tqdm
 import librosa
 import random
@@ -18,48 +18,42 @@ class Decoder(nn.Module):
     """
     VAE Decoder
     """    
-    def __init__(self, input_size, hidden_dim, dilation_rates, out_channels, upsamples, zsize = 128, num_cycles = 10, num_cycle_layers = 3, kernel_size = 3, pre_kernel_size = 32, use_jitter = True, jitter_probability = 0.12, use_kaiming_normal = False):
+    def __init__(self, input_size, hidden_dim, out_channels, upsamples, zsize = 128, use_jitter = True, jitter_probability = 0.12, use_kaiming_normal = True):
         super().__init__()
-
-        # assert len(dilation_rates) == num_cycles * num_cycle_layers
-        self.receptive_field = sum(dilation_rates) * (kernel_size - 1) + pre_kernel_size
 
         self.use_jitter = use_jitter
         if use_jitter:
             self.jitter = WOP.Jitter(jitter_probability)
 
-        # self.mulaw = MuLawEncoding(256)
+
         self.linear = nn.Linear(int(zsize), int(input_size[1] // 2 * hidden_dim))
 
-        # self.conv_1 = nn.Conv1d(
-        #     in_channels=64,
-        #     out_channels=768,
-        #     kernel_size=2,
-        #     stride=1,
-        #     padding=0
-        # )
+        """
+        The jittered latent sequence is passed through a single
+        convolutional layer with filter length 3 and 128 hidden
+        units to mix information across neighboring timesteps.
+        (https://github.com/swasun/VQ-VAE-Speech/blob/master/src/models/wavenet_decoder.py#L50)
+        """
+        self.conv_1 = nn.Conv1d(in_channels = 768, 
+                                out_channels = 256, 
+                                kernel_size = 2)
 
         if use_kaiming_normal:
             self.conv_1 = nn.utils.weight_norm(self.conv_1)
             nn.init.kaiming_normal_(self.conv_1.weight)
 
-        self.wavenet = WaveNet.Wavenet(
-            out_channels = 1,
-            layers = 9,
-            stacks = 3,
-            res_channels = 768,
-            skip_channels = 768,
-            gate_channels = 768,
-            condition_channels = 768,
+        self.wavenet = Wavenet(
+            layers = 10,
+            stacks = 2,
+            out_channels = out_channels,
+            res_channels = 256,
+            skip_channels = 256,
+            gate_channels = 256,
+            cond_channels = 256,
             kernel_size = 3,
-            upsample_conditional_features=True,
-            upsample_scales = upsamples, # 768
-            timesteps = 1024
-            #upsample_scales=[2, 2, 2, 2, 12]
+            upsample_conditional_features = True,
+            upsample_scales = upsamples,
         )
-
-
-        features, timesteps = input_size
 
     def forward(self, x, cond, xsize, jitter):
         """Forward step
@@ -74,13 +68,13 @@ class Decoder(nn.Module):
         """
         cond = self.linear(cond)
         condition = cond.view(xsize)
+        
         if self.use_jitter and jitter:
             condition = self.jitter(condition)
         # print(x.size())
 
-        # condition = self.conv_1(cond)
+        condition = self.conv_1(cond)
 
-        # labels = self.mulaw(x)
         x = self.wavenet(x, condition)
 
         return x
