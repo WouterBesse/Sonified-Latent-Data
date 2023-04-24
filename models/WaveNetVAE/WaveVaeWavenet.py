@@ -1,76 +1,85 @@
 import math
 import numpy as np
-
 import torch
 from torch import nn
-import models.VAEWavenet.WaveVaeOperations as WOP
+import models.WaveNetVAE.WaveVaeOperations as WOP
 
 class Wavenet(nn.Module):
 
-    def __init__(self, out_channels, layers = 1, stacks = 2, res_channels = 512, skip_channels = 512, gate_channels = 512, condition_channels = -1, kernel_size = 3, freq_axis_kernel_size=3, dropout = 1 - 0.95, timesteps = 512, upsample_conditional_features = False, upsample_scales = None):
+    def __init__(self, 
+                 layers = 1, 
+                 stacks = 2, 
+                 out_channels = 256, 
+                 res_channels = 512, 
+                 skip_channels = 512, 
+                 gate_channels = 512, 
+                 cond_channels = -1, 
+                 kernel_size = 3, 
+                 freq_axis_kernel_size = 3, 
+                 dropout = 1 - 0.95, 
+                 upsample_conditional_features = True, 
+                 upsample_scales = None,
+                 bias = True):
+        
         super(Wavenet, self).__init__()
 
         #assert layers % stacks == 0
-        layers_per_stack = layers // stacks
         self.upsample = upsample_conditional_features
 
-        self.first_conv = WOP.normalisedConv1d(1, res_channels, kernel_size=1, padding=0, dilation=1, bias=True, std_mul=1.0)
-        self.skip_conv = WOP.normalisedConv1d(res_channels, res_channels, kernel_size=1, padding=0, dilation=1, bias=True, std_mul=1.0)
+        self.first_conv = nn.Conv1d(in_channels = 1, 
+                                    out_channels = res_channels, 
+                                    kernel_size=1,
+                                    dilation=1, 
+                                    bias=bias)
+        
+        self.skip_conv = nn.Conv1d(in_channels = res_channels, 
+                                   out_channels = res_channels, 
+                                   kernel_size = 1, 
+                                   bias = bias)
 
         # Wavenet layers
-        dilation = 1
-        
         receptive_field = 1
-        self.dropout = nn.Dropout(p = dropout)
-        
+        self.dilations = []
+        self.dilated_queues = []
         self.conv_layers = nn.ModuleList()
-        for stack in range(stacks):
-            for layer in range(layers):
-                dilation = 2**layer
 
+        for stack in range(stacks):
+            additional_scope = kernel_size - 1
+            new_dilation = 1
+            for layer in range(layers):
                 resdilconv = WOP.ResidualConv1dGLU(
                     residual_channels = res_channels,
                     gate_channels = gate_channels,
                     kernel_size = kernel_size,
                     skip_out_channels = skip_channels,
-                    cin_channels = condition_channels,
-                    dilation = dilation,
+                    cin_channels = cond_channels,
+                    dilation = new_dilation,
                     dropout = dropout,
                     weight_normalisation = True,
                 )
                 self.conv_layers.append(resdilconv)
+
+                receptive_field += additional_scope
+                additional_scope *= 2
+                new_dilation *= 2
+
+        self.receptive_field = receptive_field
+        print("WaveNet Receptive Field: ", self.receptive_field)
         
-        self.final_convs_1 = nn.Sequential(
-            WOP.normalisedConv1d(skip_channels, 1024, kernel_size = 3),
+        self.final_convs = nn.Sequential(
+            WOP.normalisedConv1d(skip_channels, 
+                                 out_channels, 
+                                 kernel_size = 1),
             nn.LeakyReLU(negative_slope=0.1, inplace=True),
-            nn.BatchNorm1d(1024),
-            #nn.Dropout(p = dropout)
-            # nn.Linear(int(timesteps * skip_channels), int(timesteps * skip_channels))
-        )
-        
-        self.final_convs_2 = nn.Sequential(
-            WOP.normalisedConv1d(1024, 512, kernel_size = 1),
-            nn.LeakyReLU(negative_slope=0.1, inplace=True),
-            nn.BatchNorm1d(512),
-            #nn.Dropout(p = dropout),
-            # nn.Conv1d(512, 256, kernel_size = 3, padding = 'same'),
-            # nn.Tanh()
-            # nn.Linear(int(timesteps * out_channels), int(timesteps * out_channels))
-        )
-        
-        self.final_convs_3 = nn.Sequential(
-            WOP.normalisedConv1d(512, 256, kernel_size = 1),
-            nn.LeakyReLU(negative_slope=0.1, inplace=True),
-            nn.BatchNorm1d(256),
-            #nn.Dropout(p = dropout),
-            nn.Conv1d(256, out_channels, kernel_size = 1, padding = 'same', bias=True),
-            # nn.Tanh()
-            # nn.Linear(int(timesteps * out_channels), int(timesteps * out_channels))
+            nn.BatchNorm1d(out_channels),
+            nn.Conv1d(in_channels = out_channels, 
+                      out_channels = out_channels, 
+                      kernel_size = 1),
+            nn.ReLU(inplace=True),
         )
 
-
-        # Upsample conv net
-        # self.upsample_conv_seq = nn.Sequential()
+        # Convolutions for upsampling latent space condition
+        self.upsample_conv_seq = nn.Sequential()
         if upsample_conditional_features:
             self.upsample_conv = []
             for s in upsample_scales:
@@ -87,9 +96,6 @@ class Wavenet(nn.Module):
             self.upsample_conv_seq = nn.Sequential(*self.upsample_conv) 
         else:
             self.upsample_conv = None
-
-        self.receptive_field = WOP.receptive_field_size(layers, stacks, kernel_size)
-        print("Receptive field = ", self.receptive_field)
 
     def forward(self, x, c = None, softmax = True):
         """Forward step
@@ -122,11 +128,6 @@ class Wavenet(nn.Module):
             x, skip = layer(x, c, skip)
 
         x = skip
-        x = self.final_convs_1(x)
-        # x = self.dropout(x)
-        x = self.final_convs_2(x)
-        x = self.final_convs_3(x)
-        # x = self.dropout(x)
-
+        x = self.final_convs(x)
         return x
         
