@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you'd like to cite this in a research, please cite it as below."
+authors:
+  - family-names: Besse
+    given-names: Wouter Machiel
+    orcid: https://orcid.org/0000-0003-4925-7248
+title: "Sonified Latent Data"
+version: 1.0.0
+url: "https://github.com/WouterBesse/Sonified-Latent-Data"
+date-released: 2023-24-04
