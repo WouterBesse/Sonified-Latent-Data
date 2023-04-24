@@ -26,7 +26,7 @@ class Decoder(nn.Module):
             self.jitter = WOP.Jitter(jitter_probability)
 
 
-        self.linear = nn.Linear(int(zsize), int(input_size[1] // 2 * hidden_dim))
+        # self.linear = nn.Linear(int(zsize), int(input_size[1] // hidden_dim))
 
         """
         The jittered latent sequence is passed through a single
@@ -34,7 +34,7 @@ class Decoder(nn.Module):
         units to mix information across neighboring timesteps.
         (https://github.com/swasun/VQ-VAE-Speech/blob/master/src/models/wavenet_decoder.py#L50)
         """
-        self.conv_1 = nn.Conv1d(in_channels = 768, 
+        self.conv_1 = nn.Conv1d(in_channels = 32, 
                                 out_channels = 256, 
                                 kernel_size = 2)
 
@@ -55,7 +55,7 @@ class Decoder(nn.Module):
             upsample_scales = upsamples,
         )
 
-    def forward(self, x, cond, xsize, jitter):
+    def forward(self, x, cond, jitter):
         """Forward step
         Args:
             x (Tensor): Mono audio signal, shape (B x 1 x T)
@@ -66,8 +66,6 @@ class Decoder(nn.Module):
         Returns:
             X (Tensor): Denoised result, shape (B x 1 x T)
         """
-        cond = self.linear(cond)
-        condition = cond.view(xsize)
 
         if self.use_jitter and jitter:
             condition = self.jitter(condition)
@@ -142,14 +140,21 @@ class Encoder(nn.Module):
                               padding = 1),
                     nn.ReLU(True)))
 
-        self.linear = nn.Linear(int(timesteps // 2 * hidden_dim), int(zsize))
-        self.flatton = WOP.Flatten()
+        """
+        The linear block from the WaveNet VQVAE paper.
+        This is deceptively not an actual linear layer, but just a convolution layer.
+        """
+        self.linear = nn.Conv1d(hidden_dim,
+                                zsize * 2,
+                                kernel_size = 1,
+                                bias = False)
+        # self.flatten = WOP.Flatten()
 
 
     def forward(self, x):
         """Forward step
         Args:
-            x (Tensor): Noisy MFCC, shape (B x features x timesteps)
+            x (Tensor): MFCC, shape (B x features x timesteps)
         Returns:
             zcomb[:, :self.zsize] (Tensor): Latent space mean, shape (B x zsize)
             zcomb[:, self.zsize:] (Tensor): Latent space variance, shape (B x zsize)
@@ -174,31 +179,28 @@ class Encoder(nn.Module):
             x = x + xrelu
         x = self.Rel(x)
 
-        # Flatten into latent space
-        x_size = x.size()
+        z_double = self.linear(x)
 
-        flatx = self.flatton(x)
-        zcomb = self.linear(flatx)
+        mu, log_var = torch.split(z_double, self.zsize, dim = 1)
 
-        # return zcomb[:, :self.zsize], zcomb[:, self.zsize:], x_size
-        return zcomb, x_size
+        return mu, log_var
     
 
 class WaveNetVAE(nn.Module):
 
-    def __init__(self, input_size, device, num_hiddens, dil_rates, zsize = 128, resblocks = 2, out_channels = 256):
+    def __init__(self, input_size, num_hiddens, dil_rates, zsize = 32, resblocks = 2, out_channels = 256):
         super(WaveNetVAE, self).__init__()
 
         self.encoder = Encoder(
             input_size = input_size,
-            hidden_dim = 768,
+            hidden_dim = num_hiddens,
             zsize = zsize,
             resblocks = resblocks,   
         )
 
         self.decoder = Decoder(
             input_size = input_size,
-            hidden_dim = 768,
+            hidden_dim = num_hiddens,
             dilation_rates = dil_rates,
             out_channels = out_channels,
             upsamples = dil_rates,
@@ -238,10 +240,11 @@ class WaveNetVAE(nn.Module):
             mean (Tensor): Mean of latent space, shape (B x zsize)
             var (Tensor): Variance of latent space, shape (B x zsize)
         """
-        z, xsize = self.encoder(xspec)
-        # z = self.sample(mean, var)
+        mean, log_var = self.encoder(xspec)
 
-        x_hat = self.decoder(xau, z, xsize, jitter)
+        z = self.sample(mean, log_var)
+
+        x_hat = self.decoder(xau, z, jitter)
         
         return x_hat
 
