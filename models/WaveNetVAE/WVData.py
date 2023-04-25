@@ -23,7 +23,7 @@ class WVDataset(Dataset):
         self.mfcc = torchaudio.transforms.MFCC(
             sample_rate = sample_rate,
             n_mfcc = 40,
-            melkwargs = {"n_fft": 400, "hop_length": 160, "n_mels": 23}
+            melkwargs = {"hop_length": 160}
         )
 
         path_list = os.listdir(audio_path)
@@ -48,36 +48,36 @@ class WVDataset(Dataset):
                     i += self.skip_size
 
 
-        def process_audio(self, audio):
-            """
-            Process, normalise, mulaw encode and one hot encode audio.
-            """
-            audio = torch.from_numpy(audio)
+    def process_audio(self, audio):
+        """
+        Process, normalise, mulaw encode and one hot encode audio.
+        """
+        audio = torch.from_numpy(audio)
 
-            if audio.shape()[0] == 2: # Make mono if stereo
-                audio = torch.mean(audio, dim=0).unsqueeze(0)
+        if audio.size()[0] == 2: # Make mono if stereo
+            audio = torch.mean(audio, dim=0).unsqueeze(0)
 
-            norm_audio = audio / torch.max(torch.abs(audio)) # Normalise to be between -1 and 1
+        norm_audio = audio / torch.max(torch.abs(audio)) # Normalise to be between -1 and 1
 
-            audio = self.mulaw(norm_audio)
-            audio = F.one_hot(audio, 256)
+        audio = self.mulaw(norm_audio)
+        audio = F.one_hot(audio, 256)
 
-            return audio, norm_audio
+        return audio, norm_audio
 
-        def process_mfcc(self, audio):
-            mfcc = self.mfcc(audio)
-            mfcc /= torch.max(self.mfcc)
+    def process_mfcc(self, audio):
+        mfcc = self.mfcc(audio)
+        mfcc /= torch.max(mfcc)
 
-            return mfcc
+        return mfcc
 
-        def __len__(self):
-            return len(self.files)
+    def __len__(self):
+        return len(self.files)
 
-        def __getitem__(self, idx):
-            onehot, mfcc, target = self.files[idx]
+    def __getitem__(self, idx):
+        onehot, mfcc, target = self.files[idx]
 
-            # , self.pure_noise[idx]#, waveform_noisy_unquantized
-            return onehot, mfcc, target[-1]
+        # , self.pure_noise[idx]#, waveform_noisy_unquantized
+        return onehot, mfcc, target[-1]
 
 
 
@@ -95,7 +95,7 @@ def load_wav(filename, sampling_rate, res_type = 'kaiser_fast', top_db = 20, tri
     trimmed_audio /= np.abs(trimmed_audio).max()
     trimmed_audio = trimmed_audio.astype(np.float32)
 
-    return trimmed_audio, trimming_time
+    return trimmed_audio
 
 def is_audio_file(filename): # is_audio_file and load_wav from https://github.com/swasun/VQ-VAE-Speech/blob/master/src/dataset/vctk.py
     return any(filename.endswith(extension) for extension in AUDIO_EXTENSIONS)

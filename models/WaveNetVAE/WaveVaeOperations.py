@@ -115,14 +115,15 @@ class ResidualConv1dGLU(nn.Module):
         x = self.dropout(x)
         condition = self.conv1cond(c)
 
-        
-        # Dilated convolution
-        x = self.dil_conv(x)
-        a, b = x.split(x.size(self.splitdim) // 2, dim=self.splitdim)
+        x = self.dil_conv(x) # Dilated convolution
+
+        x = x[:, :, :residual.size(-1)] # Remove future time steps
+
+        a, b = x.split(x.size(self.splitdim) // 2, dim=self.splitdim) # Get filter and gate
 
         # local conditioning
-        ca, cb = c.split(condition.size(self.splitdim) // 2, dim=self.splitdim)
-        filt, gate = a + ca, b + cb
+        ca, cb = c.split(condition.size(self.splitdim) // 2, dim=self.splitdim) # Get filter and gate from condition
+        filt, gate = a + ca, b + cb # Combine filters and gates
 
         x = torch.tanh(filt) * torch.sigmoid(gate)
 
