@@ -18,7 +18,7 @@ class Decoder(nn.Module):
     VAE Decoder
     """
 
-    def __init__(self, input_size, hidden_dim, out_channels, upsamples, zsize=128, use_jitter=True,
+    def __init__(self, out_channels, upsamples, zsize=128, use_jitter=True,
                  jitter_probability=0.12, use_kaiming_normal=True):
         super().__init__()
 
@@ -34,7 +34,7 @@ class Decoder(nn.Module):
         units to mix information across neighboring timesteps.
         (https://github.com/swasun/VQ-VAE-Speech/blob/master/src/models/wavenet_decoder.py#L50)
         """
-        self.conv_1 = nn.Conv1d(in_channels=32,
+        self.conv_1 = nn.Conv1d(in_channels=zsize,
                                 out_channels=256,
                                 kernel_size=2)
 
@@ -54,6 +54,8 @@ class Decoder(nn.Module):
             upsample_conditional_features=True,
             upsample_scales=upsamples,
         )
+
+        self.receptive_field = self.wavenet.receptive_field
 
     def forward(self, x, cond, jitter):
         """Forward step
@@ -187,7 +189,7 @@ class Encoder(nn.Module):
 
 class WaveNetVAE(nn.Module):
 
-    def __init__(self, input_size, num_hiddens, dil_rates, zsize=32, resblocks=2, out_channels=256):
+    def __init__(self, input_size, num_hiddens, upsamples, zsize=32, resblocks=2, out_channels=256):
         super(WaveNetVAE, self).__init__()
 
         self.encoder = Encoder(
@@ -198,14 +200,12 @@ class WaveNetVAE(nn.Module):
         )
 
         self.decoder = Decoder(
-            input_size=input_size,
-            hidden_dim=num_hiddens,
-            dilation_rates=dil_rates,
             out_channels=out_channels,
-            upsamples=dil_rates,
+            upsamples=upsamples,
             zsize=zsize
         )
 
+        self.receptive_field = self.decoder.receptive_field
         self.mulaw = MuLawEncoding()
         self.N = torch.distributions.Normal(0, 1)
         # self.N.loc = self.N.loc.cuda() # hack to get sampling on the GPU
