@@ -2,6 +2,7 @@ import torch
 from torch import nn
 import numpy as np
 import math
+from torch import Tensor
 
 """
 Util functions
@@ -134,3 +135,4 @@ class ResidualConv1dGLU(nn.Module):
         x = (x + residual) * math.sqrt(0.5)
         
         return x, skip
+
