@@ -26,7 +26,7 @@ class Wavenet(nn.Module):
         #assert layers % stacks == 0
         self.upsample = upsample_conditional_features
 
-        self.first_conv = nn.Conv1d(in_channels = 1, 
+        self.first_conv = nn.Conv1d(in_channels = out_channels,
                                     out_channels = res_channels, 
                                     kernel_size=1,
                                     dilation=1, 
@@ -112,12 +112,14 @@ class Wavenet(nn.Module):
         # print(c.size())
 
         # B x 1 x C x T
+        print(c.size())
         c = c.unsqueeze(1)
 
         c = self.upsample_conv_seq(c)
         # B x C x T
         c = c.squeeze(1)
-        # print(c.size(-1), x.size(-1))
+
+        print(c.size(), x.size())
         assert c.size(-1) == x.size(-1)
         
         # Feed data to network

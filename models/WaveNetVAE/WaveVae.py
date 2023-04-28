@@ -36,7 +36,8 @@ class Decoder(nn.Module):
         """
         self.conv_1 = nn.Conv1d(in_channels=zsize,
                                 out_channels=256,
-                                kernel_size=2)
+                                kernel_size=2,
+                                padding='same')
 
         if use_kaiming_normal:
             self.conv_1 = nn.utils.weight_norm(self.conv_1)
@@ -68,12 +69,12 @@ class Decoder(nn.Module):
         Returns:
             X (Tensor): Denoised result, shape (B x 1 x T)
         """
-
+        condition = cond
         if self.use_jitter and jitter:
             condition = self.jitter(condition)
         # print(x.size())
 
-        condition = self.conv_1(cond)
+        condition = self.conv_1(condition)
 
         x = self.wavenet(x, condition)
 
@@ -112,7 +113,7 @@ class Encoder(nn.Module):
                                     hidden_dim,
                                     kernel_size=4,
                                     stride=2,
-                                    padding=2)
+                                    padding=1)
 
         """
         Residual convs
@@ -123,7 +124,7 @@ class Encoder(nn.Module):
                 nn.Conv1d(hidden_dim,
                           hidden_dim,
                           kernel_size=3,
-                          padding=1))
+                          padding='same'))
 
         """
         Relu blocks
@@ -135,12 +136,12 @@ class Encoder(nn.Module):
                     nn.Conv1d(hidden_dim,
                               hidden_dim,
                               kernel_size=3,
-                              padding=1),
+                              padding='same'),
                     nn.ReLU(True),
                     nn.Conv1d(hidden_dim,
                               hidden_dim,
                               kernel_size=3,
-                              padding=1),
+                              padding='same'),
                     nn.ReLU(True)))
 
         """
@@ -150,7 +151,8 @@ class Encoder(nn.Module):
         self.linear = nn.Conv1d(hidden_dim,
                                 zsize * 2,
                                 kernel_size=1,
-                                bias=False)
+                                bias=False,
+                                padding='same')
 
     def forward(self, x):
         """Forward step
@@ -167,7 +169,9 @@ class Encoder(nn.Module):
         x = self.ReL(net) + self.ReL(conv)
 
         # Downsample
+        print("Before downsample: ", x.size())
         x = self.ReL(self.downsample(x))
+        print("After downsample: ", x.size())
 
         # Residual convs
         for resblock in self.resblocks:
@@ -178,7 +182,7 @@ class Encoder(nn.Module):
         for relblock in self.relublocks:
             xrelu = relblock(x)
             x = x + xrelu
-        x = self.Rel(x)
+        x = self.ReL(x)
 
         z_double = self.linear(x)
 
