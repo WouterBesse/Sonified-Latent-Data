@@ -248,7 +248,7 @@ class WaveNetVAE(nn.Module):
 
         x_hat = self.decoder(xau, z, jitter)
 
-        return x_hat
+        return x_hat, mean, log_var
 
 
 
