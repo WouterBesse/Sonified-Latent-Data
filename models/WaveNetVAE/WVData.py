@@ -96,7 +96,7 @@ class WVDataset(Dataset):
 Utility Functions
 """
 def load_wav(filename, sampling_rate, res_type = 'kaiser_fast', top_db = 20, trimming_duration=None):
-    raw, _ = librosa.load(filename, sampling_rate, res_type=res_type)
+    raw, _ = librosa.load(filename, sr = sampling_rate, res_type=res_type)
     if trimming_duration is None:
         trimmed_audio, trimming_indices = librosa.effects.trim(raw, top_db=top_db)
         trimming_time = trimming_indices[0] / sampling_rate

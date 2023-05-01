@@ -96,7 +96,7 @@ class Wavenet(nn.Module):
         else:
             self.upsample_conv = None
 
-    def forward(self, x, c = None, softmax = True):
+    def forward(self, x, c = None, verbose = False):
         """Forward step
         Args:
             x (Tensor): One-hot encoded audio signal, shape (B x C x T)
@@ -109,17 +109,19 @@ class Wavenet(nn.Module):
         """
 
         B, _, T = x.size()
-        # print(c.size())
 
         # B x 1 x C x T
-        print(c.size())
+        if verbose:
+            print("Condition before upsampling: ", c.size())
         c = c.unsqueeze(1)
 
         c = self.upsample_conv_seq(c)
         # B x C x T
         c = c.squeeze(1)
 
-        print(c.size(), x.size())
+        if verbose:
+            print("Condition and x after c upsampling: ", c.size(), x.size())
+        
         assert c.size(-1) == x.size(-1)
         
         # Feed data to network

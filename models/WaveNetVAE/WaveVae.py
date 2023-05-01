@@ -58,7 +58,7 @@ class Decoder(nn.Module):
 
         self.receptive_field = self.wavenet.receptive_field
 
-    def forward(self, x, cond, jitter):
+    def forward(self, x, cond, jitter, verbose):
         """Forward step
         Args:
             x (Tensor): Mono audio signal, shape (B x 1 x T)
@@ -67,16 +67,17 @@ class Decoder(nn.Module):
             xsize (Tuple): Size of condition before flattening
             jitter (Bool): Argument deciding if we should jitter our condition or not
         Returns:
-            X (Tensor): Denoised result, shape (B x 1 x T)
+            X (Tensor): Reconstructed result, shape (B x 1 x T)
         """
         condition = cond
         if self.use_jitter and jitter:
             condition = self.jitter(condition)
-        # print(x.size())
+        if verbose:
+            print("X size before wavenet: ", x.size())
 
         condition = self.conv_1(condition)
 
-        x = self.wavenet(x, condition)
+        x = self.wavenet(x, condition, verbose)
 
         return x
 
@@ -154,7 +155,7 @@ class Encoder(nn.Module):
                                 bias=False,
                                 padding='same')
 
-    def forward(self, x):
+    def forward(self, x, verbose):
         """Forward step
         Args:
             x (Tensor): MFCC, shape (B x features x timesteps)
@@ -169,9 +170,11 @@ class Encoder(nn.Module):
         x = self.ReL(net) + self.ReL(conv)
 
         # Downsample
-        print("Before downsample: ", x.size())
+        if verbose:
+            print("Before downsample: ", x.size())
         x = self.ReL(self.downsample(x))
-        print("After downsample: ", x.size())
+        if verbose:
+            print("After downsample: ", x.size())
 
         # Residual convs
         for resblock in self.resblocks:
@@ -231,7 +234,7 @@ class WaveNetVAE(nn.Module):
 
         return z
 
-    def forward(self, xau, xspec, jitter):
+    def forward(self, xau, xspec, jitter, verbose = False):
         """Forward step
         Args:
             xau (Tensor): Noisy audio, shape (B x 1 x T)
@@ -242,11 +245,11 @@ class WaveNetVAE(nn.Module):
             mean (Tensor): Mean of latent space, shape (B x zsize)
             var (Tensor): Variance of latent space, shape (B x zsize)
         """
-        mean, log_var = self.encoder(xspec)
+        mean, log_var = self.encoder(xspec, verbose)
 
         z = self.sample(mean, log_var)
 
-        x_hat = self.decoder(xau, z, jitter)
+        x_hat = self.decoder(xau, z, jitter, verbose)
 
         return x_hat, mean, log_var
 

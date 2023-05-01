@@ -17,7 +17,7 @@ def anneal_kl(kl_term, kl_annealing, kl_max):
     return max(kl_term, kl_max)
 
 
-def validate(model, dataloader, kl_mult, loss_fn, device='cuda'):
+def validate(model, dataloader, kl_mult, loss_fn, device='cuda', verbose = False):
     model.eval()
     total_eval_loss = [0, 0, 0]
     eval_step = 1
@@ -28,7 +28,7 @@ def validate(model, dataloader, kl_mult, loss_fn, device='cuda'):
             mfcc_input = mfcc_input.to(device)
             target = target.to(device)
 
-            output, mean, variance = model(onehot_input, mfcc_input, True)
+            output, mean, variance = model(onehot_input, mfcc_input, True, verbose)
             real_loss, rec_loss, kl_loss = calculate_loss(
                 output, target, mean, variance, kl_mult, loss_fn)
             total_eval_loss = [
@@ -44,7 +44,7 @@ def validate(model, dataloader, kl_mult, loss_fn, device='cuda'):
     return total_eval_loss[0] / eval_step, total_eval_loss[1] / eval_step, total_eval_loss[2] / eval_step
 
 
-def train(model, dataloader_train, dataloader_val, writer, learning_rate=0.00001, epoch_amount=100, logs_per_epoch=5, kl_anneal=0.01, max_kl=0.5, device='cuda'):
+def train(model, dataloader_train, dataloader_val, writer, learning_rate=0.00001, epoch_amount=100, logs_per_epoch=5, kl_anneal=0.01, max_kl=0.5, device='cuda', verbose = False):
     loss_fn = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     logstep = 0
@@ -64,10 +64,11 @@ def train(model, dataloader_train, dataloader_val, writer, learning_rate=0.00001
                 mfcc_input = mfcc_input.to(device)
                 target = target.to(device)
 
-                output, mean, variance = model(onehot_input, mfcc_input, True)
+                output, mean, variance = model(onehot_input, mfcc_input, True, verbose)
 
                 real_loss, rec_loss, kl_loss = calculate_loss(
                     output, target, mean, variance, kl_mult, loss_fn)
+                
                 real_loss.backward()
                 optimizer.step()
 
@@ -79,7 +80,7 @@ def train(model, dataloader_train, dataloader_val, writer, learning_rate=0.00001
                 ]
 
                 t.set_description(
-                    f"Validating. Rec/real loss for step {step}: {round(rec_loss.item(), 2)}/{round(real_loss.item(), 2)}.")
+                    f"Training. Rec/real loss for step {step}: {round(rec_loss.item(), 2)}/{round(real_loss.item(), 2)}.")
                 writer.add_scalar('Train step loss:',
                                   real_loss.item(), total_step)
                 step += 1
@@ -88,7 +89,7 @@ def train(model, dataloader_train, dataloader_val, writer, learning_rate=0.00001
                 if step % (len(dataloader_train) // logs_per_epoch) == 0 or step - 1 == 0:
 
                     eval_loss_real, eval_loss_rec, eval_loss_kl = validate(
-                        model, dataloader_val, kl_mult, loss_fn, device)
+                        model, dataloader_val, kl_mult, loss_fn, device, verbose)
 
                     writer.add_scalars('Validation Loss', {
                         'Real loss': eval_loss_real,
