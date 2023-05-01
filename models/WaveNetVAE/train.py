@@ -1,13 +1,12 @@
 from tqdm.auto import tqdm
 import torch
+import os
 
-torch.cuda.empty_cache()
-
-
-def calculate_loss(output, target, mean, variance, kl_term, loss_fn):
+def calculate_loss(output, target, mu, logvar, kl_term, loss_fn):
     reconstruction_loss = loss_fn(output[:, :, -1], target)
-    kl_loss = - 0.5 * torch.mean(1 + variance - mean.pow(2) - variance.exp())
-
+    kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+    kl_loss = torch.mean(kl_loss, dim = 0)
+    
     return reconstruction_loss + kl_loss * kl_term, reconstruction_loss, kl_loss
 
 
@@ -16,7 +15,13 @@ def anneal_kl(kl_term, kl_annealing, kl_max):
 
     return max(kl_term, kl_max)
 
+def export_model(model, path):
+    isExist = os.path.exists(path)
+    if not isExist:
+       os.makedirs(path)
 
+    torch.save(model.state_dict(), path)
+    
 def validate(model, dataloader, kl_mult, loss_fn, device='cuda', verbose = False):
     model.eval()
     total_eval_loss = [0, 0, 0]
@@ -45,6 +50,7 @@ def validate(model, dataloader, kl_mult, loss_fn, device='cuda', verbose = False
 
 
 def train(model, dataloader_train, dataloader_val, writer, learning_rate=0.00001, epoch_amount=100, logs_per_epoch=5, kl_anneal=0.01, max_kl=0.5, device='cuda', verbose = False):
+    torch.cuda.empty_cache()
     loss_fn = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     logstep = 0
@@ -104,3 +110,6 @@ def train(model, dataloader_train, dataloader_val, writer, learning_rate=0.00001
                     }, logstep)
 
                     logstep += 1
+                    kl_mult = anneal_kl(kl_mult, kl_anneal, max_kl)
+    
+    export_model(model, "/exports")

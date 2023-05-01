@@ -5,7 +5,7 @@ import os
 import librosa
 import torchaudio
 import torch.nn.functional as F
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 AUDIO_EXTENSIONS = [
     '.wav', '.mp3', '.flac', '.sph', '.ogg', '.opus',
@@ -14,7 +14,7 @@ AUDIO_EXTENSIONS = [
 
 class WVDataset(Dataset):
 
-    def __init__(self, audio_path, length, sample_rate, hop_length = 160):
+    def __init__(self, audio_path, length, sample_rate, max_files = 0, hop_length = 160):
         super(WVDataset, self).__init__()
 
 
@@ -38,6 +38,9 @@ class WVDataset(Dataset):
         )
 
         path_list = os.listdir(audio_path)
+        
+        if max_files is not 0:
+            path_list = path_list[0:max_files]
 
         self.files = []
 
