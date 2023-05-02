@@ -35,7 +35,7 @@ class Decoder(nn.Module):
         (https://github.com/swasun/VQ-VAE-Speech/blob/master/src/models/wavenet_decoder.py#L50)
         """
         self.conv_1 = nn.Conv1d(in_channels=zsize,
-                                out_channels=256,
+                                out_channels=768,
                                 kernel_size=2,
                                 padding='same')
 
@@ -47,10 +47,10 @@ class Decoder(nn.Module):
             layers=10,
             stacks=2,
             out_channels=out_channels,
-            res_channels=256,
-            skip_channels=256,
-            gate_channels=256,
-            cond_channels=256,
+            res_channels=768,
+            skip_channels=768,
+            gate_channels=768,
+            cond_channels=768,
             kernel_size=3,
             upsample_conditional_features=True,
             upsample_scales=upsamples,
@@ -247,11 +247,13 @@ class WaveNetVAE(nn.Module):
         """
         mean, log_var = self.encoder(xspec, verbose)
 
-        z = self.sample(mean, log_var)
+        z = self.samplenew(mean, log_var)
 
         x_hat = self.decoder(xau, z, jitter, verbose)
 
         return x_hat, mean, log_var
+    
+    def inference
 
 
 

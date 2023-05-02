@@ -66,12 +66,13 @@ class Wavenet(nn.Module):
         print("WaveNet Receptive Field: ", self.receptive_field)
         
         self.final_convs = nn.Sequential(
-            nn.Conv1d(skip_channels,
-                      out_channels,
-                      kernel_size = 1),
             nn.ReLU(inplace=True),
-            nn.BatchNorm1d(out_channels),
-            nn.Conv1d(in_channels = out_channels, 
+            nn.Conv1d(skip_channels,
+                      skip_channels,
+                      kernel_size = 1),
+            # nn.ReLU(inplace=True),
+            # nn.BatchNorm1d(out_channels),
+            nn.Conv1d(in_channels = skip_channels, 
                       out_channels = out_channels, 
                       kernel_size = 1),
             #nn.ReLU(inplace=True),

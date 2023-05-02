@@ -39,7 +39,7 @@ class WVDataset(Dataset):
 
         path_list = os.listdir(audio_path)
         
-        if max_files is not 0:
+        if max_files != 0:
             path_list = path_list[0:max_files]
 
         self.files = []
@@ -54,8 +54,8 @@ class WVDataset(Dataset):
                 i = 0
 
                 while i < norm_audio.size()[-1] - self.length:
-                    input_audio = onehot_wave[i:i + self.length]
-                    target_sample = mulaw_audio[i + self.length:i + self.length + 1]
+                    input_audio = norm_audio[i:i + self.length] * 0.5 + 0.5
+                    target_sample = norm_audio[i + self.length:i + self.length + 1] * 0.5 + 0.5
                     mfcc = self.process_mfcc(norm_audio[i:i + self.length])
                     self.files.append((input_audio, mfcc, target_sample))
 
@@ -90,8 +90,8 @@ class WVDataset(Dataset):
     def __getitem__(self, idx):
         onehot, mfcc, target = self.files[idx]
 
-        # , self.pure_noise[idx]#, waveform_noisy_unquantized
-        return torch.transpose(onehot, 0, 1).type(torch.FloatTensor), mfcc.type(torch.FloatTensor), target[-1].type(torch.LongTensor)
+        # return torch.transpose(onehot, 0, 1).type(torch.FloatTensor), mfcc.type(torch.FloatTensor), target[-1].type(torch.LongTensor)
+        return torch.unsqueeze(onehot, 0).type(torch.FloatTensor), mfcc.type(torch.FloatTensor), target[-1].type(torch.FloatTensor)
 
 
 
