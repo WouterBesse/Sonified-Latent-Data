@@ -12,33 +12,23 @@ AUDIO_EXTENSIONS = [
     '.WAV', '.MP3', '.FLAC', '.SPH', '.OGG', '.OPUS',
 ]
 
+
 class WVDataset(Dataset):
 
-    def __init__(self, audio_path, length, sample_rate, max_files = 0, hop_length = 160):
+    def __init__(self, audio_path, length, skip_size, sample_rate, max_files=0, hop_length=160):
         super(WVDataset, self).__init__()
 
-
-        # Operations to keep sample length a multiple of the hop length
-        # length += hop_length * 6 # Seems to make sure that the mfcc length is an even number :)
         self.length = length
-        # self.length -= length % hop_length
-        # half_mfcc_len = self.length // hop_length // 2 + 1
-        # print(half_mfcc_len)
-        # self.length -= (self.length % half_mfcc_len)
-        # self.length += half_mfcc_len
-        print(self.length)
-        # self.length = int(self.length)
-
-        self.skip_size = self.length // 2
-        self.mulaw = torchaudio.transforms.MuLawEncoding(quantization_channels = 256)
+        self.skip_size = skip_size
+        self.mulaw = torchaudio.transforms.MuLawEncoding(quantization_channels=256)
         self.mfcc = torchaudio.transforms.MFCC(
-            sample_rate = sample_rate,
-            n_mfcc = 40,
-            melkwargs = {"hop_length": hop_length}
+            sample_rate=sample_rate,
+            n_mfcc=40,
+            melkwargs={"hop_length": hop_length}
         )
 
         path_list = os.listdir(audio_path)
-        
+
         if max_files != 0:
             path_list = path_list[0:max_files]
 
@@ -61,17 +51,16 @@ class WVDataset(Dataset):
 
                     i += self.skip_size
 
-
     def process_audio(self, audio):
         """
         Process, normalise, mulaw encode and one hot encode audio.
         """
         audio = torch.from_numpy(audio)
 
-        if audio.size()[0] == 2: # Make mono if stereo
+        if audio.size()[0] == 2:  # Make mono if stereo
             audio = torch.mean(audio, dim=0).unsqueeze(0)
 
-        norm_audio = audio / torch.max(torch.abs(audio)) # Normalise to be between -1 and 1
+        norm_audio = audio / torch.max(torch.abs(audio))  # Normalise to be between -1 and 1
 
         mulawq = self.mulaw(norm_audio)
         audio = F.one_hot(mulawq, 256)
@@ -91,15 +80,17 @@ class WVDataset(Dataset):
         onehot, mfcc, target = self.files[idx]
 
         # return torch.transpose(onehot, 0, 1).type(torch.FloatTensor), mfcc.type(torch.FloatTensor), target[-1].type(torch.LongTensor)
-        return torch.unsqueeze(onehot, 0).type(torch.FloatTensor), mfcc.type(torch.FloatTensor), target[-1].type(torch.FloatTensor)
-
+        return torch.unsqueeze(onehot, 0).type(torch.FloatTensor), mfcc.type(torch.FloatTensor), target[-1].type(
+            torch.FloatTensor)
 
 
 """
 Utility Functions
 """
-def load_wav(filename, sampling_rate, res_type = 'kaiser_fast', top_db = 20, trimming_duration=None):
-    raw, _ = librosa.load(filename, sr = sampling_rate, res_type=res_type)
+
+
+def load_wav(filename, sampling_rate, res_type='kaiser_fast', top_db=20, trimming_duration=None):
+    raw, _ = librosa.load(filename, sr=sampling_rate, res_type=res_type)
     if trimming_duration is None:
         trimmed_audio, trimming_indices = librosa.effects.trim(raw, top_db=top_db)
         trimming_time = trimming_indices[0] / sampling_rate
@@ -111,6 +102,7 @@ def load_wav(filename, sampling_rate, res_type = 'kaiser_fast', top_db = 20, tri
 
     return trimmed_audio
 
-def is_audio_file(filename): # is_audio_file and load_wav from https://github.com/swasun/VQ-VAE-Speech/blob/master/src/dataset/vctk.py
-    return any(filename.endswith(extension) for extension in AUDIO_EXTENSIONS)
 
+def is_audio_file(
+        filename):  # is_audio_file and load_wav from https://github.com/swasun/VQ-VAE-Speech/blob/master/src/dataset/vctk.py
+    return any(filename.endswith(extension) for extension in AUDIO_EXTENSIONS)

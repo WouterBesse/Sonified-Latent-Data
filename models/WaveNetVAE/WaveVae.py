@@ -6,7 +6,7 @@ from torchaudio.transforms import MuLawEncoding, MFCC, Resample
 import torchaudio
 import models.WaveNetVAE.WaveVaeOperations as WOP
 from models.WaveNetVAE.WaveVaeWavenet import Wavenet
-from tqdm import tqdm
+from tqdm.auto import tqdm
 import random
 import numpy as np
 import soundfile as sf
@@ -247,13 +247,30 @@ class WaveNetVAE(nn.Module):
         """
         mean, log_var = self.encoder(xspec, verbose)
 
-        z = self.samplenew(mean, log_var)
+        z = None
+        if self.training:
+            z = self.samplenew(mean, log_var)
+        else:
+            z = mean
 
         x_hat = self.decoder(xau, z, jitter, verbose)
 
         return x_hat, mean, log_var
     
-    def inference
+    def inference(self, dataloader, size = 4096, device='cuda'):
+
+        audio_gen = torch.zeros(1, 1, size).to(device)
+        first_loop = True
+        for mfcc_snip in enumerate(tqdm(dataloader)):
+            snippet_gen = self.forward(audio_gen[:, :, -4096:], mfcc_snip.to(device), False)
+            if first_loop:
+                audio_gen = snippet_gen
+            else:
+                audio_gen = torch.cat((audio_gen, snippet_gen[:, :, -1]), 2)
+
+        return audio_gen
+
+
 
 
 
