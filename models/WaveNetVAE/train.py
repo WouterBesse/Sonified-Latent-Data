@@ -7,6 +7,7 @@ from WaveVae import WaveNetVAE
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from WVData import WVDataset
+import warnings
 
 def calculate_loss(output, target, mu, logvar, kl_term, loss_fn):
     # target = target = torch.unsqueeze(torch.unsqueeze(target[:, -1], 1), 1)
@@ -131,10 +132,11 @@ def train(model, dataloader_train, dataloader_val, writer, learning_rate=0.00001
     export_model(model, "/exports")
 
 if __name__ == '__main__':
+    warnings.filterwarnings("ignore")
     
     parser = argparse.ArgumentParser(description = 'Train the model')
-    parser.add_argument('-vp', '--validation_path', help='enter the path to the validation data', type=str)
     parser.add_argument('-tp', '--train_path', help='enter the path to the training data', type=str)
+    parser.add_argument('-vp', '--validation_path', help='enter the path to the validation data', type=str)
     parser.add_argument('-ep' , '--epochs', help='enter the amount of epochs', type=int)
     parser.add_argument('-bs', '--batch_size', help='enter the batch size', type=int, default = 2)
     parser.add_argument('-lr', '--learning_rate', help='enter the learning rate', type=float, default = 0.00001)
