@@ -106,6 +106,7 @@ def train(model, dataloader_train, dataloader_val, writer, learning_rate=0.00001
                                   real_loss.item(), total_step)
                 step += 1
                 total_step += 1
+                divstep += 1
 
                 if step % (len(dataloader_train) // logs_per_epoch) == 0 or step - 1 == 0:
 
@@ -128,6 +129,9 @@ def train(model, dataloader_train, dataloader_val, writer, learning_rate=0.00001
                     total_epoch_loss = [0, 0, 0]
                     divstep = 0
                     kl_mult = anneal_kl(kl_mult, kl_anneal, max_kl)
+
+        if epoch % 5 == 0:
+            export_model(model, "/exports")
     
     export_model(model, "/exports")
 
