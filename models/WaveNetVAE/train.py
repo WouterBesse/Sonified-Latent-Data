@@ -2,6 +2,11 @@ from tqdm.auto import tqdm
 import torch
 import os
 import math
+import argparse
+from WaveVae import WaveNetVAE
+from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+from WVData import WVDataset
 
 def calculate_loss(output, target, mu, logvar, kl_term, loss_fn):
     # target = target = torch.unsqueeze(torch.unsqueeze(target[:, -1], 1), 1)
@@ -124,3 +129,67 @@ def train(model, dataloader_train, dataloader_val, writer, learning_rate=0.00001
                     kl_mult = anneal_kl(kl_mult, kl_anneal, max_kl)
     
     export_model(model, "/exports")
+
+if __name__ == '__main__':
+    
+    parser = argparse.ArgumentParser(description = 'Train the model')
+    parser.add_argument('validation_path', help='enter the path to the validation data', type=str)
+    parser.add_argument('train_path', help='enter the path to the training data', type=str)
+    parser.add_argument('epochs', help='enter the amount of epochs', type=int)
+    parser.add_argument('batch_size', help='enter the batch size', type=int, default = 2)
+    parser.add_argument('learning_rate', help='enter the learning rate', type=float, default = 0.00001)
+    parser.add_argument('kl_anneal', help='enter the kl anneal', type=float, default = 0.01)
+    parser.add_argument('max_kl', help='enter the max kl', type=float, default = 0.5)
+    parser.add_argument('logs_per_epoch', help='enter the logs per epoch', type=int, default = 6)
+    parser.add_argument('device', help='enter the device', type=str, default = 'cuda:2')
+    parser.add_argument('max_files', help='enter the max files', type=int, default = 800)
+    
+
+    args = parser.parse_args()
+
+    batchsize = args.batch_size
+    device = args.device
+    input_size = (40, 112)
+    upsamples = [2, 2, 2, 2, 2, 2, 2, 2]
+    zsize = 32
+
+    WaveVAE = WaveNetVAE(input_size,
+                        num_hiddens = 768,
+                        upsamples = upsamples,
+                        zsize = zsize,
+                        out_channels = 256)
+
+    WaveVAE.to(device)
+
+    VAEDataset = WVDataset(audio_path = args.train_path,
+                        length = 4096,
+                        skip_size = 4096 // 2,
+                        sample_rate = 24000,
+                        max_files = args.max_files,
+                        hop_length = 128)
+
+    val_VAEDataset = WVDataset(audio_path = args.validation_path,
+                        length = 4096,
+                        skip_size = 4096 // 2,
+                        sample_rate = 24000,
+                        max_files = 200,
+                        hop_length = 128)
+
+    VAEDataloader = DataLoader(VAEDataset,
+                            batch_size = batchsize,
+                            shuffle = True)
+
+    val_VAEDataloader = DataLoader(val_VAEDataset,
+                            batch_size = batchsize,
+                            shuffle = False)
+    
+    writer = SummaryWriter()
+
+    train(WaveVAE, VAEDataloader, val_VAEDataloader, 
+          writer=writer, 
+          learning_rate=args.learning_rate, 
+          epoch_amount=args.epochs, 
+          logs_per_epoch=args.logs_per_epoch, 
+          kl_anneal=args.kl_anneal, 
+          max_kl=args.max_kl, 
+          device=device)
