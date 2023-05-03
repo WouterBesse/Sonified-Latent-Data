@@ -74,7 +74,7 @@ class Wavenet(nn.Module):
                       skip_channels,
                       kernel_size = 1),
             nn.ReLU(inplace=True),
-            nn.Dropout(p=0.05),
+            # nn.Dropout(p=0.05),
             nn.Conv1d(in_channels = skip_channels, 
                       out_channels = out_channels, 
                       kernel_size = 1),
