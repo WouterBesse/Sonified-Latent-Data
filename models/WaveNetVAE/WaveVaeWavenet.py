@@ -19,7 +19,7 @@ class Wavenet(nn.Module):
                  dropout = 1 - 0.95, 
                  upsample_conditional_features = True, 
                  upsample_scales = None,
-                 bias = True):
+                 bias = False):
         
         super(Wavenet, self).__init__()
 
@@ -129,11 +129,14 @@ class Wavenet(nn.Module):
         # Feed data to network
         # x = self.first_conv(x)
         x = self.emb(x).transpose(1, 2)
-        skip = self.skip_conv(x)
+        # skip = self.skip_conv(x)
+        skip = 0
         for layer in self.conv_layers:
-            x, skip = layer(x, c, skip)
+            x, s = layer(x, c)
+            skip += s
+        skips *= math.sqrt(1.0 / len(self.conv_layers))
 
-        x = skip
+        x = skips
         x = self.final_convs(x)
         return x
         

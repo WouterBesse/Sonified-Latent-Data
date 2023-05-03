@@ -78,7 +78,7 @@ class Jitter(nn.Module):
 
 class ResidualConv1dGLU(nn.Module):
 
-    def __init__(self, residual_channels, gate_channels, kernel_size, skip_out_channels = None, cin_channels = -1, dropout= 1 - 0.95, dilation = 1, bias = True):
+    def __init__(self, residual_channels, gate_channels, kernel_size, skip_out_channels = None, cin_channels = -1, dropout= 1 - 0.95, dilation = 1, bias = False):
         super(ResidualConv1dGLU, self).__init__()
 
         self.dropout = nn.Dropout(p = dropout)
@@ -112,7 +112,7 @@ class ResidualConv1dGLU(nn.Module):
                                     padding = 'same')
         self.splitdim = 1
 
-    def forward(self, x, c, skip):
+    def forward(self, x, c):
         """Forward
         Args:
             x (Tensor): B x C x T
@@ -138,11 +138,10 @@ class ResidualConv1dGLU(nn.Module):
 
         # For skip connection
         s = self.conv1_skip(x)
-        skip = skip + s
 
         # For residual connection
         x = self.conv1_out(x)
         x += residual
         
-        return x, skip
+        return x, s
 
