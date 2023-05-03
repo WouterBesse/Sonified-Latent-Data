@@ -130,10 +130,10 @@ class Wavenet(nn.Module):
         # x = self.first_conv(x)
         x = self.emb(x).transpose(1, 2)
         # skip = self.skip_conv(x)
-        skip = 0
+        skips = 0
         for layer in self.conv_layers:
             x, s = layer(x, c)
-            skip += s
+            skips += s
         skips *= math.sqrt(1.0 / len(self.conv_layers))
 
         x = skips
