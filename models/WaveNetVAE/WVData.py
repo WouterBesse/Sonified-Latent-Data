@@ -43,13 +43,16 @@ class WVDataset(Dataset):
 
                 i = 0
 
-                while i < norm_audio.size()[-1] - self.length:
-                    input_audio = norm_audio[i:i + self.length] * 0.5 + 0.5
-                    target_sample = norm_audio[i + self.length:i + self.length + 1] * 0.5 + 0.5
-                    mfcc = self.process_mfcc(norm_audio[i:i + self.length])
-                    self.files.append((input_audio, mfcc, target_sample))
+                # while i < norm_audio.size()[-1] - self.length:
+                with tqdm(total=24000) as pbar:
+                    for i in range(24000):
+                        input_audio = norm_audio[i:i + self.length] * 0.5 + 0.5
+                        target_sample = norm_audio[i + self.length:i + self.length + 1] * 0.5 + 0.5
+                        mfcc = self.process_mfcc(norm_audio[i:i + self.length])
+                        self.files.append((input_audio, mfcc, target_sample))
 
-                    i += self.skip_size
+                        i += self.skip_size
+                        pbar.update(1)
 
     def process_audio(self, audio):
         """

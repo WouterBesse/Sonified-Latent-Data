@@ -39,6 +39,7 @@ class Jitter(nn.Module):
 
     def forward(self, quantized):
         original_quantized = quantized.clone()
+        new_quantized = quantized.clone()
         length = original_quantized.size(2)
 
         for i in range(length):
@@ -59,9 +60,9 @@ class Jitter(nn.Module):
                     or before it."
                     """
                     neighbor_index = i + np.random.choice([-1, 1], p=[0.5, 0.5])
-                quantized[:, :, i] = original_quantized[:, :, neighbor_index]
+                new_quantized[:, :, i] = original_quantized[:, :, neighbor_index]
 
-        return quantized
+        return new_quantized
 
 class ResidualConv1dGLU(nn.Module):
 

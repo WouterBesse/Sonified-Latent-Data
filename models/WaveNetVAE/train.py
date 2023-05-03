@@ -28,25 +28,27 @@ def validate(model, dataloader, kl_mult, loss_fn, device='cuda', verbose = False
     model.eval()
     total_eval_loss = [0, 0, 0]
     eval_step = 1
+    
+    with torch.no_grad():
 
-    with tqdm(enumerate(dataloader), total=len(dataloader), desc="Validating") as t:
-        for batch_idx, (onehot_input, mfcc_input, target) in t:
-            onehot_input = onehot_input.to(device)
-            mfcc_input = mfcc_input.to(device)
-            target = target.to(device)
+        with tqdm(enumerate(dataloader), total=len(dataloader), desc="Validating") as t:
+            for batch_idx, (onehot_input, mfcc_input, target) in t:
+                onehot_input = onehot_input.to(device)
+                mfcc_input = mfcc_input.to(device)
+                target = target.to(device)
 
-            output, mean, variance = model(onehot_input, mfcc_input, False, verbose)
-            real_loss, rec_loss, kl_loss = calculate_loss(
-                output, target, mean, variance, kl_mult, loss_fn)
-            total_eval_loss = [
-                total_eval_loss[0] + real_loss.item(),
-                total_eval_loss[1] + rec_loss.item(),
-                total_eval_loss[2] + kl_loss.item()
-            ]
+                output, mean, variance = model(onehot_input, mfcc_input, False, verbose)
+                real_loss, rec_loss, kl_loss = calculate_loss(
+                    output, target, mean, variance, kl_mult, loss_fn)
+                total_eval_loss = [
+                    total_eval_loss[0] + real_loss.item(),
+                    total_eval_loss[1] + rec_loss.item(),
+                    total_eval_loss[2] + kl_loss.item()
+                ]
 
-            t.set_description(
-                f"Validating. Rec loss: {round(rec_loss.item(), 2)}.")
-            eval_step += 1
+                t.set_description(
+                    f"Validating. Rec loss: {round(rec_loss.item(), 2)}.")
+                eval_step += 1
 
     return total_eval_loss[0] / eval_step, total_eval_loss[1] / eval_step, total_eval_loss[2] / eval_step
 

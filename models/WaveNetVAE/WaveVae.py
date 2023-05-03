@@ -260,13 +260,18 @@ class WaveNetVAE(nn.Module):
     def inference(self, dataloader, size = 4096, device='cuda'):
 
         audio_gen = torch.zeros(1, 1, size).to(device)
+        print(audio_gen.size())
         first_loop = True
-        for mfcc_snip in enumerate(tqdm(dataloader)):
-            snippet_gen = self.forward(audio_gen[:, :, -4096:], mfcc_snip.to(device), False)
+        for batch_idx, (onehot_input, mfcc_input, target) in enumerate(tqdm(dataloader)):
+            
             if first_loop:
+                snippet_gen, _, _ = self.forward(onehot_input.to(device), mfcc_input.to(device), False)
+                # audio_gen = torch.cat((audio_gen[:, :, :-snippet_gen.size()[-1]], snippet_gen), 2)
                 audio_gen = snippet_gen
+                first_loop = False
             else:
-                audio_gen = torch.cat((audio_gen, snippet_gen[:, :, -1]), 2)
+                snippet_gen, _, _ = self.forward(audio_gen[:, :, -4096:], mfcc_input.to(device), False)
+                audio_gen = torch.cat((audio_gen, snippet_gen[:, :, -1].unsqueeze(2)), 2)
 
         return audio_gen
 
