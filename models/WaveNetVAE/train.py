@@ -6,7 +6,7 @@ import math
 def calculate_loss(output, target, mu, logvar, kl_term, loss_fn):
     # target = target = torch.unsqueeze(torch.unsqueeze(target[:, -1], 1), 1)
     # print(output[:, -1:, :].size(), 
-    reconstruction_loss = loss_fn(output[:, -1, :], target[:, -1])
+    reconstruction_loss = loss_fn(output[:, -1, :] * 100, target[:, -1])
     # reconstruction_loss *= math.log2(math.e)
     kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
     kl_loss = torch.mean(kl_loss, dim = 0)
@@ -68,9 +68,11 @@ def train(model, dataloader_train, dataloader_val, writer, learning_rate=0.00001
         model.train(True)
         total_epoch_loss = [0, 0, 0]
         step = 1
+        divstep = 1
 
         with tqdm(enumerate(dataloader_train), total=len(dataloader_train), desc=f"Training. Epoch: {epoch}. Loss for step {step}: n.v.t.") as t:
             for batch_idx, (onehot_input, mfcc_input, target) in t:
+                model.train(True)
                 optimizer.zero_grad(set_to_none=True)
 
                 onehot_input = onehot_input.to(device)
@@ -111,12 +113,14 @@ def train(model, dataloader_train, dataloader_val, writer, learning_rate=0.00001
                     }, logstep)
 
                     writer.add_scalars('Train loss', {
-                        'Real loss': total_epoch_loss[0] / step,
-                        'Reconstruction loss': total_epoch_loss[1] / step,
-                        'Kl loss': total_epoch_loss[2] / step
+                        'Real loss': total_epoch_loss[0] / divstep,
+                        'Reconstruction loss': total_epoch_loss[1] / divstep,
+                        'Kl loss': total_epoch_loss[2] / divstep
                     }, logstep)
 
                     logstep += 1
+                    total_epoch_loss = [0, 0, 0]
+                    divstep = 0
                     kl_mult = anneal_kl(kl_mult, kl_anneal, max_kl)
     
     export_model(model, "/exports")
