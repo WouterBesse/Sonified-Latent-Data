@@ -4,8 +4,8 @@ from torch import nn, from_numpy
 from torch.utils.data import Dataset
 from torchaudio.transforms import MuLawEncoding, MFCC, Resample
 import torchaudio
-import models.WaveNetVAE.WaveVaeOperations as WOP
-from models.WaveNetVAE.WaveVaeWavenet import Wavenet
+import WaveVaeOperations as WOP
+from WaveVaeWavenet import Wavenet
 from tqdm.auto import tqdm
 import random
 import numpy as np
