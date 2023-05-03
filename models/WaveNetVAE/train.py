@@ -133,16 +133,16 @@ def train(model, dataloader_train, dataloader_val, writer, learning_rate=0.00001
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description = 'Train the model')
-    parser.add_argument('validation_path', help='enter the path to the validation data', type=str)
-    parser.add_argument('train_path', help='enter the path to the training data', type=str)
-    parser.add_argument('epochs', help='enter the amount of epochs', type=int)
-    parser.add_argument('batch_size', help='enter the batch size', type=int, default = 2)
-    parser.add_argument('learning_rate', help='enter the learning rate', type=float, default = 0.00001)
-    parser.add_argument('kl_anneal', help='enter the kl anneal', type=float, default = 0.01)
-    parser.add_argument('max_kl', help='enter the max kl', type=float, default = 0.5)
-    parser.add_argument('logs_per_epoch', help='enter the logs per epoch', type=int, default = 6)
-    parser.add_argument('device', help='enter the device', type=str, default = 'cuda:2')
-    parser.add_argument('max_files', help='enter the max files', type=int, default = 800)
+    parser.add_argument('-vp', '--validation_path', help='enter the path to the validation data', type=str)
+    parser.add_argument('-tp', '--train_path', help='enter the path to the training data', type=str)
+    parser.add_argument('-ep' , '--epochs', help='enter the amount of epochs', type=int)
+    parser.add_argument('-bs', '--batch_size', help='enter the batch size', type=int, default = 2)
+    parser.add_argument('-lr', '--learning_rate', help='enter the learning rate', type=float, default = 0.00001)
+    parser.add_argument('-kla', '--kl_anneal', help='enter the kl anneal', type=float, default = 0.01)
+    parser.add_argument('-mkl', '--max_kl', help='enter the max kl', type=float, default = 0.5)
+    parser.add_argument('-lpe', '--logs_per_epoch', help='enter the logs per epoch', type=int, default = 6)
+    parser.add_argument('-d', '--device', help='enter the device', type=str, default = 'cuda:2')
+    parser.add_argument('-mf', '--max_files', help='enter the max files', type=int, default = 800)
     
 
     args = parser.parse_args()
