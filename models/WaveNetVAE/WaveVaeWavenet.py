@@ -32,6 +32,9 @@ class Wavenet(nn.Module):
                                     dilation=1, 
                                     bias=bias)
         
+        self.emb = nn.Sequential(nn.Embedding(out_channels, res_channels, padding_idx=out_channels // 2 - 1),
+                                 nn.Tanh())
+        
         self.skip_conv = nn.Conv1d(in_channels = res_channels, 
                                    out_channels = res_channels, 
                                    kernel_size = 1, 
@@ -72,7 +75,6 @@ class Wavenet(nn.Module):
                       kernel_size = 1),
             nn.ReLU(inplace=True),
             nn.Dropout(p=0.05),
-            # nn.BatchNorm1d(out_channels),
             nn.Conv1d(in_channels = skip_channels, 
                       out_channels = out_channels, 
                       kernel_size = 1),
@@ -110,8 +112,6 @@ class Wavenet(nn.Module):
             Tensor: output, shape B x out_channels x T
         """
 
-        B, _, T = x.size()
-
         # B x 1 x C x T
         if verbose:
             print("Condition before upsampling: ", c.size())
@@ -127,7 +127,8 @@ class Wavenet(nn.Module):
         assert c.size(-1) == x.size(-1)
         
         # Feed data to network
-        x = self.first_conv(x)
+        # x = self.first_conv(x)
+        x = self.emb(x).transpose(1, 2)
         skip = self.skip_conv(x)
         for layer in self.conv_layers:
             x, skip = layer(x, c, skip)

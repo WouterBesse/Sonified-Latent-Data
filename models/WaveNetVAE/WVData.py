@@ -47,11 +47,11 @@ class WVDataset(Dataset):
 
                 
                 with tqdm(total=norm_audio.size()[-1] // skip_size - 2, leave=False) as pbar:
-                # with tqdm(total=24000, leave=False) as pbar:
+                # with tqdm(total=4096, leave=False) as pbar:
                     while i < norm_audio.size()[-1] - self.length:
-                    # for i in range(24000):
-                        input_audio = norm_audio[i:i + self.length] * 0.5 + 0.5
-                        target_sample = norm_audio[i:i + self.length + 1] * 0.5 + 0.5
+                    # for i in range(4096):
+                        input_audio = mulaw_audio[i:i + self.length] * 0.5 + 0.5
+                        target_sample = mulaw_audio[i:i + self.length + 1] * 0.5 + 0.5
                         mfcc = self.process_mfcc(norm_audio[i:i + self.length])
                         self.files.append((input_audio, mfcc, target_sample))
                         
@@ -92,9 +92,9 @@ class WVDataset(Dataset):
         onehot, mfcc, target = self.files[idx]
         # mfcc = (mfcc - self.mfcc_min) / (self.mfcc_max - self.mfcc_min)
 
-        # return torch.transpose(onehot, 0, 1).type(torch.FloatTensor), mfcc.type(torch.FloatTensor), target[-1].type(torch.LongTensor)
-        return torch.unsqueeze(onehot, 0).type(torch.FloatTensor), mfcc.type(torch.FloatTensor), target.type(
-            torch.FloatTensor)
+        return onehot.type(torch.LongTensor), mfcc.type(torch.FloatTensor), target.type(torch.LongTensor)
+        # return torch.unsqueeze(onehot, 0).type(torch.FloatTensor), mfcc.type(torch.FloatTensor), target.type(
+            # torch.FloatTensor)
 
 
 """

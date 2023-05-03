@@ -4,8 +4,8 @@ import os
 import math
 
 def calculate_loss(output, target, mu, logvar, kl_term, loss_fn):
-    target = target = torch.unsqueeze(torch.unsqueeze(target[:, -1], 1), 1)
-    reconstruction_loss = loss_fn(output[:, :, -1], target[:, :, -1]) * 100
+    # target = target = torch.unsqueeze(torch.unsqueeze(target[:, -1], 1), 1)
+    reconstruction_loss = loss_fn(output[:, -1:].contiguous().view(1, 256), target[:, -1:].contiguous().view(-1))
     # reconstruction_loss *= math.log2(math.e)
     kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
     kl_loss = torch.mean(kl_loss, dim = 0)
@@ -40,7 +40,7 @@ def validate(model, dataloader, kl_mult, loss_fn, device='cuda', verbose = False
 
                 output, mean, variance = model(onehot_input, mfcc_input, False, verbose)
                 real_loss, rec_loss, kl_loss = calculate_loss(
-                    output, target, mean, variance, kl_mult, loss_fn)
+                    output.transpose(1, 2), target, mean, variance, kl_mult, loss_fn)
                 total_eval_loss = [
                     total_eval_loss[0] + real_loss.item(),
                     total_eval_loss[1] + rec_loss.item(),
@@ -56,8 +56,8 @@ def validate(model, dataloader, kl_mult, loss_fn, device='cuda', verbose = False
 
 def train(model, dataloader_train, dataloader_val, writer, learning_rate=0.00001, epoch_amount=100, logs_per_epoch=5, kl_anneal=0.01, max_kl=0.5, device='cuda', verbose = False):
     torch.cuda.empty_cache()
-    # loss_fn = torch.nn.CrossEntropyLoss()
-    loss_fn = torch.nn.MSELoss()
+    loss_fn = torch.nn.CrossEntropyLoss()
+    # loss_fn = torch.nn.MSELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     logstep = 0
     kl_mult = 0.0
@@ -79,7 +79,7 @@ def train(model, dataloader_train, dataloader_val, writer, learning_rate=0.00001
                 output, mean, variance = model(onehot_input, mfcc_input, True, verbose)
 
                 real_loss, rec_loss, kl_loss = calculate_loss(
-                    output, target, mean, variance, kl_mult, loss_fn)
+                    output.transpose(1, 2), target, mean, variance, kl_mult, loss_fn)
                 
                 real_loss.backward()
                 optimizer.step()
