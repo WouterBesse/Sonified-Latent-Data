@@ -17,10 +17,22 @@ def normalisedConvTranspose2d(in_channels, out_channels, kernel_size,
         return nn.utils.weight_norm(m)
     else:
         return m
-    
+
 """
 Torch Modules
 """
+class CausalConvolution1D(nn.Module):
+
+    def __init__(self, input_channels, output_channels, kernel_size = 1, dilation = 0, bias = False) -> None:
+        super(CausalConvolution1D, self).__init__()
+
+        self.padding = (kernel_size - 1) * dilation
+        self.conv = nn.Conv1d(input_channels, output_channels, kernel_size, padding = 0, dilation = dilation, bias = bias)
+
+    def forward(self, x):
+        x = torch.nn.functional.pad(x, (self.padding, 0))
+        return self.conv(x)
+
 class Jitter(nn.Module):
     """
     Jitter implementation from [Chorowski et al., 2019].
@@ -72,13 +84,9 @@ class ResidualConv1dGLU(nn.Module):
         self.dropout = nn.Dropout(p = dropout)
 #       dilations = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
 
-        # padding = dilation
-        self.padding = (kernel_size - 1) * dilation
-
-        self.dil_conv = nn.Conv1d(residual_channels, 
+        self.dil_conv = CausalConvolution1D(residual_channels, 
                                   gate_channels, 
                                   kernel_size,
-                                  padding = 0,
                                   dilation = dilation,
                                   bias = bias)
 
@@ -115,10 +123,10 @@ class ResidualConv1dGLU(nn.Module):
         residual = x
         x = self.dropout(x)
         condition = self.conv1cond(c)
-        x = torch.nn.functional.pad(x, (self.padding, 0))  
+
         x = self.dil_conv(x) # Dilated convolution
 
-        x = x[:, :, :residual.size(-1)] # Remove future time steps
+        # x = x[:, :, :residual.size(-1)] # Remove future time steps
 
         a, b = x.split(x.size(self.splitdim) // 2, dim=self.splitdim) # Get filter and gate
 
@@ -134,7 +142,7 @@ class ResidualConv1dGLU(nn.Module):
 
         # For residual connection
         x = self.conv1_out(x)
-        # x = (x + residual) * math.sqrt(0.5)
+        x += residual
         
         return x, skip
 
