@@ -28,6 +28,8 @@ class WVDataset(Dataset):
         )
 
         path_list = os.listdir(audio_path)
+        self.mfcc_max = 0
+        self.mfcc_min = 9999999999999
 
         if max_files != 0:
             path_list = path_list[0:max_files]
@@ -43,13 +45,20 @@ class WVDataset(Dataset):
 
                 i = 0
 
-                # while i < norm_audio.size()[-1] - self.length:
-                with tqdm(total=24000) as pbar:
-                    for i in range(24000):
+                
+                with tqdm(total=norm_audio.size()[-1] // skip_size - 2, leave=False) as pbar:
+                # with tqdm(total=24000, leave=False) as pbar:
+                    while i < norm_audio.size()[-1] - self.length:
+                    # for i in range(24000):
                         input_audio = norm_audio[i:i + self.length] * 0.5 + 0.5
-                        target_sample = norm_audio[i + self.length:i + self.length + 1] * 0.5 + 0.5
+                        target_sample = norm_audio[i:i + self.length + 1] * 0.5 + 0.5
                         mfcc = self.process_mfcc(norm_audio[i:i + self.length])
                         self.files.append((input_audio, mfcc, target_sample))
+                        
+                        if torch.max(mfcc) > self.mfcc_max:
+                            self.mfcc_max = torch.max(mfcc)
+                        if torch.min(mfcc) < self.mfcc_min:
+                            self.mfcc_min = torch.min(mfcc)
 
                         i += self.skip_size
                         pbar.update(1)
@@ -81,9 +90,10 @@ class WVDataset(Dataset):
 
     def __getitem__(self, idx):
         onehot, mfcc, target = self.files[idx]
+        # mfcc = (mfcc - self.mfcc_min) / (self.mfcc_max - self.mfcc_min)
 
         # return torch.transpose(onehot, 0, 1).type(torch.FloatTensor), mfcc.type(torch.FloatTensor), target[-1].type(torch.LongTensor)
-        return torch.unsqueeze(onehot, 0).type(torch.FloatTensor), mfcc.type(torch.FloatTensor), target[-1].type(
+        return torch.unsqueeze(onehot, 0).type(torch.FloatTensor), mfcc.type(torch.FloatTensor), target.type(
             torch.FloatTensor)
 
 

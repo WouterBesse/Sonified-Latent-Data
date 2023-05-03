@@ -70,12 +70,13 @@ class Wavenet(nn.Module):
             nn.Conv1d(skip_channels,
                       skip_channels,
                       kernel_size = 1),
-            # nn.ReLU(inplace=True),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.05),
             # nn.BatchNorm1d(out_channels),
             nn.Conv1d(in_channels = skip_channels, 
                       out_channels = out_channels, 
                       kernel_size = 1),
-            #nn.ReLU(inplace=True),
+            nn.ReLU(inplace=True),
         )
 
         # Convolutions for upsampling latent space condition

@@ -35,7 +35,7 @@ class Decoder(nn.Module):
         (https://github.com/swasun/VQ-VAE-Speech/blob/master/src/models/wavenet_decoder.py#L50)
         """
         self.conv_1 = nn.Conv1d(in_channels=zsize,
-                                out_channels=768,
+                                out_channels=512,
                                 kernel_size=2,
                                 padding='same')
 
@@ -47,10 +47,10 @@ class Decoder(nn.Module):
             layers=10,
             stacks=2,
             out_channels=out_channels,
-            res_channels=768,
-            skip_channels=768,
-            gate_channels=768,
-            cond_channels=768,
+            res_channels=512,
+            skip_channels=512,
+            gate_channels=512,
+            cond_channels=512,
             kernel_size=3,
             upsample_conditional_features=True,
             upsample_scales=upsamples,
@@ -265,9 +265,10 @@ class WaveNetVAE(nn.Module):
         for batch_idx, (onehot_input, mfcc_input, target) in enumerate(tqdm(dataloader)):
             
             if first_loop:
+                audio_gen = onehot_input.to(device)
                 snippet_gen, _, _ = self.forward(onehot_input.to(device), mfcc_input.to(device), False)
-                # audio_gen = torch.cat((audio_gen[:, :, :-snippet_gen.size()[-1]], snippet_gen), 2)
-                audio_gen = snippet_gen
+                audio_gen = torch.cat((audio_gen, snippet_gen[:, :, -1].unsqueeze(2)), 2)
+                # audio_gen = snippet_gen
                 first_loop = False
             else:
                 snippet_gen, _, _ = self.forward(audio_gen[:, :, -4096:], mfcc_input.to(device), False)

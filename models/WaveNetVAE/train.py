@@ -4,7 +4,8 @@ import os
 import math
 
 def calculate_loss(output, target, mu, logvar, kl_term, loss_fn):
-    reconstruction_loss = loss_fn(output[:, :, -1], target) * 100
+    target = target = torch.unsqueeze(torch.unsqueeze(target[:, -1], 1), 1)
+    reconstruction_loss = loss_fn(output[:, :, -1], target[:, :, -1]) * 100
     # reconstruction_loss *= math.log2(math.e)
     kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
     kl_loss = torch.mean(kl_loss, dim = 0)
