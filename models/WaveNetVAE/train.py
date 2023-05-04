@@ -19,6 +19,14 @@ def calculate_loss(output, target, mu, logvar, kl_term, loss_fn):
     
     return reconstruction_loss + kl_loss * kl_term, reconstruction_loss, kl_loss
 
+def clear_screen():
+    # Clearing the Screen
+    # posix is os name for Linux or mac
+    if (os.name == 'posix'):
+        os.system('clear')
+        # else screen will be cleared for windows
+    else:
+        os.system('cls')
 
 def anneal_kl(kl_term, kl_annealing, kl_max):
     kl_term += kl_annealing
@@ -61,7 +69,7 @@ def validate(model, dataloader, kl_mult, loss_fn, device='cuda', verbose = False
     return total_eval_loss[0] / eval_step, total_eval_loss[1] / eval_step, total_eval_loss[2] / eval_step
 
 
-def train(model, dataloader_train, dataloader_val, writer, learning_rate=0.00001, epoch_amount=100, logs_per_epoch=5, kl_anneal=0.01, max_kl=0.5, device='cuda', verbose = False):
+def train(model, dataloader_train, dataloader_val, writer, export_path, learning_rate=0.00001, epoch_amount=100, logs_per_epoch=5, kl_anneal=0.01, max_kl=0.5, device='cuda', verbose = False):
     torch.cuda.empty_cache()
     loss_fn = torch.nn.CrossEntropyLoss()
     # loss_fn = torch.nn.MSELoss()
@@ -131,17 +139,19 @@ def train(model, dataloader_train, dataloader_val, writer, learning_rate=0.00001
                     kl_mult = anneal_kl(kl_mult, kl_anneal, max_kl)
 
         if epoch % 5 == 0:
-            export_model(model, "/exports")
+            export_model(model, export_path)
     
-    export_model(model, "/exports")
+    export_model(model, export_path)
 
 if __name__ == '__main__':
     warnings.filterwarnings("ignore")
+    clear_screen()
     
     parser = argparse.ArgumentParser(description = 'Train the model')
     parser.add_argument('-tp', '--train_path', help='enter the path to the training data', type=str)
     parser.add_argument('-vp', '--validation_path', help='enter the path to the validation data', type=str)
     parser.add_argument('-ep' , '--epochs', help='enter the amount of epochs', type=int)
+    parser.add_argument('-ex', '--export_path', help='Location to export models', type=str, default = './exports')
     parser.add_argument('-bs', '--batch_size', help='enter the batch size', type=int, default = 2)
     parser.add_argument('-lr', '--learning_rate', help='enter the learning rate', type=float, default = 0.00001)
     parser.add_argument('-kla', '--kl_anneal', help='enter the kl anneal', type=float, default = 0.01)
@@ -158,6 +168,13 @@ if __name__ == '__main__':
     input_size = (40, 112)
     upsamples = [2, 2, 2, 2, 2, 2, 2, 2]
     zsize = 32
+
+    isExist = os.path.exists(args.export_path)
+    if not isExist:
+        os.makedirs(args.export_path)
+        print("Export path didn't exist, created directory")
+    else:
+        print("Export path exists")
 
     WaveVAE = WaveNetVAE(input_size,
                         num_hiddens = 768,
@@ -193,6 +210,7 @@ if __name__ == '__main__':
 
     train(WaveVAE, VAEDataloader, val_VAEDataloader, 
           writer=writer, 
+          export_path = args.export_path,
           learning_rate=args.learning_rate, 
           epoch_amount=args.epochs, 
           logs_per_epoch=args.logs_per_epoch, 
