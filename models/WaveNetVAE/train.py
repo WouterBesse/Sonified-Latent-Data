@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from WVData import WVDataset
 import warnings
+from datetime import datetime
 
 def calculate_loss(output, target, mu, logvar, kl_term, loss_fn):
     # target = target = torch.unsqueeze(torch.unsqueeze(target[:, -1], 1), 1)
@@ -33,11 +34,17 @@ def anneal_kl(kl_term, kl_annealing, kl_max):
 
     return max(kl_term, kl_max)
 
-def export_model(model, path):
+def export_model(model, path, epoch, name = None):
     isExist = os.path.exists(path)
     if not isExist:
        os.makedirs(path)
-
+    modelname = ''
+    if name is None:
+        date = datetime.today().strftime('%Y-%m-%d')
+        modelname = date + epoch
+    else:
+        modelname = epoch
+    path = os.path.join(path, modelname)
     torch.save(model.state_dict(), path)
     
 def validate(model, dataloader, kl_mult, loss_fn, device='cuda', verbose = False):
@@ -47,7 +54,7 @@ def validate(model, dataloader, kl_mult, loss_fn, device='cuda', verbose = False
     
     with torch.no_grad():
 
-        with tqdm(enumerate(dataloader), total=len(dataloader), desc="Validating") as t:
+        with tqdm(enumerate(dataloader), total=len(dataloader), desc="Validating", colour='orange') as t:
             for batch_idx, (onehot_input, mfcc_input, target) in t:
                 onehot_input = onehot_input.to(device)
                 mfcc_input = mfcc_input.to(device)
@@ -77,6 +84,7 @@ def train(model, dataloader_train, dataloader_val, writer, export_path, learning
     logstep = 0
     kl_mult = 0.0
     total_step = 0
+    export_model(model, export_path, 0)
 
     for epoch in range(epoch_amount):
         model.train(True)
@@ -84,7 +92,7 @@ def train(model, dataloader_train, dataloader_val, writer, export_path, learning
         step = 1
         divstep = 1
 
-        with tqdm(enumerate(dataloader_train), total=len(dataloader_train), desc=f"Training. Epoch: {epoch}. Loss for step {step}: n.v.t.") as t:
+        with tqdm(enumerate(dataloader_train), total=len(dataloader_train), desc=f"Training. Epoch: {epoch}. Loss for step {step}: n.v.t.", colour='magenta') as t:
             for batch_idx, (onehot_input, mfcc_input, target) in t:
                 model.train(True)
                 optimizer.zero_grad(set_to_none=True)
@@ -139,9 +147,9 @@ def train(model, dataloader_train, dataloader_val, writer, export_path, learning
                     kl_mult = anneal_kl(kl_mult, kl_anneal, max_kl)
 
         if epoch % 5 == 0:
-            export_model(model, export_path)
+            export_model(model, export_path, epoch=epoch)
     
-    export_model(model, export_path)
+    export_model(model, export_path, epoch='final')
 
 if __name__ == '__main__':
     warnings.filterwarnings("ignore")
@@ -151,7 +159,7 @@ if __name__ == '__main__':
     parser.add_argument('-tp', '--train_path', help='enter the path to the training data', type=str)
     parser.add_argument('-vp', '--validation_path', help='enter the path to the validation data', type=str)
     parser.add_argument('-ep' , '--epochs', help='enter the amount of epochs', type=int)
-    parser.add_argument('-ex', '--export_path', help='Location to export models', type=str, default = './exports')
+    parser.add_argument('-ex', '--export_path', help='Location to export models', type=str, default = './exports/')
     parser.add_argument('-bs', '--batch_size', help='enter the batch size', type=int, default = 2)
     parser.add_argument('-lr', '--learning_rate', help='enter the learning rate', type=float, default = 0.00001)
     parser.add_argument('-kla', '--kl_anneal', help='enter the kl anneal', type=float, default = 0.01)

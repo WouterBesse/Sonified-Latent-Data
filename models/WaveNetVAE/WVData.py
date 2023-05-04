@@ -36,7 +36,7 @@ class WVDataset(Dataset):
 
         self.files = []
 
-        for path in tqdm(path_list, desc='Loading and preprocessing files to dataset.'):
+        for path in tqdm(path_list, desc='Loading and preprocessing files to dataset.', colour="blue"):
             full_path = os.path.join(audio_path, path)
             if is_audio_file(full_path):
                 waveform = load_wav(full_path, sample_rate)
