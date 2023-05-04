@@ -191,7 +191,7 @@ if __name__ == '__main__':
                         out_channels = 256)
 
     WaveVAE.to(device)
-    export_model(model, export_path, 0)
+    export_model(WaveVAE, args.export_path, 0)
 
     VAEDataset = WVDataset(audio_path = args.train_path,
                         length = 4096,
