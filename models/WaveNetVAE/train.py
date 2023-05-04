@@ -41,9 +41,9 @@ def export_model(model, path, epoch, name = None):
     modelname = ''
     if name is None:
         date = datetime.today().strftime('%Y-%m-%d')
-        modelname = date + epoch
+        modelname = date + str(epoch)
     else:
-        modelname = epoch
+        modelname = str(epoch)
     path = os.path.join(path, modelname)
     torch.save(model.state_dict(), path)
     
@@ -84,7 +84,7 @@ def train(model, dataloader_train, dataloader_val, writer, export_path, learning
     logstep = 0
     kl_mult = 0.0
     total_step = 0
-    export_model(model, export_path, 0)
+    
 
     for epoch in range(epoch_amount):
         model.train(True)
@@ -191,6 +191,7 @@ if __name__ == '__main__':
                         out_channels = 256)
 
     WaveVAE.to(device)
+    export_model(model, export_path, 0)
 
     VAEDataset = WVDataset(audio_path = args.train_path,
                         length = 4096,
