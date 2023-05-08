@@ -2,6 +2,7 @@ import math
 import numpy as np
 import torch
 from torch import nn
+# import models.WaveNetVAE.WaveVaeOperations as WOP
 import WaveVaeOperations as WOP
 
 class Wavenet(nn.Module):

@@ -3,9 +3,12 @@ import torch
 import os
 import math
 import argparse
-from WaveVae import WaveNetVAE
+
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+# from models.WaveNetVAE.WaveVae import WaveNetVAE
+# from models.WaveNetVAE.WVData import WVDataset
+from WaveVae import WaveNetVAE
 from WVData import WVDataset
 import warnings
 from datetime import datetime

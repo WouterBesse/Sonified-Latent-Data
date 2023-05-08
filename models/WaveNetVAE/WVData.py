@@ -15,7 +15,7 @@ AUDIO_EXTENSIONS = [
 
 class WVDataset(Dataset):
 
-    def __init__(self, audio_path, length, skip_size, sample_rate, max_files=0, hop_length=160):
+    def __init__(self, audio_path, length, skip_size, sample_rate, max_files=0, hop_length=160, is_generating = False):
         super(WVDataset, self).__init__()
 
         self.length = length
@@ -45,23 +45,19 @@ class WVDataset(Dataset):
 
                 i = 0
 
-                
-                with tqdm(total=norm_audio.size()[-1] // skip_size - 2, leave=False) as pbar:
-                # with tqdm(total=4096, leave=False) as pbar:
-                    while i < norm_audio.size()[-1] - self.length:
-                    # for i in range(4096):
-                        input_audio = mulaw_audio[i:i + self.length] * 0.5 + 0.5
-                        target_sample = mulaw_audio[i:i + self.length + 1] * 0.5 + 0.5
-                        mfcc = self.process_mfcc(norm_audio[i:i + self.length])
-                        self.files.append((input_audio, mfcc, target_sample))
-                        
-                        if torch.max(mfcc) > self.mfcc_max:
-                            self.mfcc_max = torch.max(mfcc)
-                        if torch.min(mfcc) < self.mfcc_min:
-                            self.mfcc_min = torch.min(mfcc)
-
-                        i += self.skip_size
-                        pbar.update(1)
+                if is_generating:
+                    with tqdm(total=4096, leave=False) as pbar:
+                        for i in range(4096):
+                            get_snippets()
+                            i += self.skip_size
+                            pbar.update(1)
+                else:
+                    with tqdm(total=norm_audio.size()[-1] // skip_size - 2, leave=False) as pbar:
+                        while i < norm_audio.size()[-1] - self.length:
+                            get_snippets()
+                            i += self.skip_size
+                            pbar.update(1)
+                            
 
     def process_audio(self, audio):
         """
@@ -84,6 +80,21 @@ class WVDataset(Dataset):
         mfcc /= torch.max(mfcc)
 
         return mfcc
+    
+    def get_snippets(self, mulaw_audio, onehot_audio, norm_audio, i):
+        input_audio = mulaw_audio[i:i + self.length]
+        target_sample = mulaw_audio[i:i + self.length + 1]
+        # onehot_target = onehot_wave[i:i + self.length + 1]
+        mfcc = self.process_mfcc(norm_audio[i:i + self.length])
+        self.files.append((input_audio, mfcc, target_sample))
+
+        if torch.max(mfcc) > self.mfcc_max:
+            self.mfcc_max = torch.max(mfcc)
+        if torch.min(mfcc) < self.mfcc_min:
+            self.mfcc_min = torch.min(mfcc)
+        return
+
+        
 
     def __len__(self):
         return len(self.files)
@@ -91,7 +102,7 @@ class WVDataset(Dataset):
     def __getitem__(self, idx):
         onehot, mfcc, target = self.files[idx]
         # mfcc = (mfcc - self.mfcc_min) / (self.mfcc_max - self.mfcc_min)
-
+        # print('WVDATA target size:', target.type(torch.LongTensor).size())
         return onehot.type(torch.LongTensor), mfcc.type(torch.FloatTensor), target.type(torch.LongTensor)
         # return torch.unsqueeze(onehot, 0).type(torch.FloatTensor), mfcc.type(torch.FloatTensor), target.type(
             # torch.FloatTensor)
