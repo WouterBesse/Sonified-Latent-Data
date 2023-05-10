@@ -121,7 +121,7 @@ class ResidualConv1dGLU(nn.Module):
             Tensor: output
         """
         residual = x
-        x = self.dropout(x)
+        # x = self.dropout(x)
         condition = self.conv1cond(c)
 
         x = self.dil_conv(x) # Dilated convolution

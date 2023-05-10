@@ -2,8 +2,8 @@ import math
 import numpy as np
 import torch
 from torch import nn
-# import models.WaveNetVAE.WaveVaeOperations as WOP
-import WaveVaeOperations as WOP
+import models.WaveNetVAE.WaveVaeOperations as WOP
+# import WaveVaeOperations as WOP
 
 class Wavenet(nn.Module):
 
@@ -79,7 +79,7 @@ class Wavenet(nn.Module):
             nn.Conv1d(in_channels = skip_channels, 
                       out_channels = out_channels, 
                       kernel_size = 1),
-            nn.ReLU(inplace=True),
+            # nn.ReLU(inplace=True),
         )
 
         # Convolutions for upsampling latent space condition
@@ -135,7 +135,7 @@ class Wavenet(nn.Module):
         for layer in self.conv_layers:
             x, s = layer(x, c)
             skips += s
-        skips *= math.sqrt(1.0 / len(self.conv_layers))
+        # skips *= math.sqrt(1.0 / len(self.conv_layers))
 
         x = skips
         x = self.final_convs(x)

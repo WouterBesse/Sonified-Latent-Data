@@ -21,6 +21,7 @@ class WVDataset(Dataset):
         self.length = length
         self.skip_size = skip_size
         self.mulaw = torchaudio.transforms.MuLawEncoding(quantization_channels=256)
+        self.is_generating = is_generating
         self.mfcc = torchaudio.transforms.MFCC(
             sample_rate=sample_rate,
             n_mfcc=40,
@@ -48,13 +49,13 @@ class WVDataset(Dataset):
                 if is_generating:
                     with tqdm(total=4096, leave=False) as pbar:
                         for i in range(4096):
-                            get_snippets()
+                            self.get_snippets(mulaw_audio, onehot_wave, norm_audio,i)
                             i += self.skip_size
                             pbar.update(1)
                 else:
                     with tqdm(total=norm_audio.size()[-1] // skip_size - 2, leave=False) as pbar:
                         while i < norm_audio.size()[-1] - self.length:
-                            get_snippets()
+                            self.get_snippets(mulaw_audio, onehot_wave, norm_audio,i)
                             i += self.skip_size
                             pbar.update(1)
                             
@@ -69,7 +70,8 @@ class WVDataset(Dataset):
             audio = torch.mean(audio, dim=0).unsqueeze(0)
 
         norm_audio = audio / torch.max(torch.abs(audio))  # Normalise to be between -1 and 1
-
+        norm_audio = torch.clamp(norm_audio, -1.0, 1.0)
+        
         mulawq = self.mulaw(norm_audio)
         audio = F.one_hot(mulawq, 256)
 
@@ -84,9 +86,12 @@ class WVDataset(Dataset):
     def get_snippets(self, mulaw_audio, onehot_audio, norm_audio, i):
         input_audio = mulaw_audio[i:i + self.length]
         target_sample = mulaw_audio[i:i + self.length + 1]
-        # onehot_target = onehot_wave[i:i + self.length + 1]
         mfcc = self.process_mfcc(norm_audio[i:i + self.length])
-        self.files.append((input_audio, mfcc, target_sample))
+        if self.is_generating:
+            onehot_target = onehot_audio[i:i + self.length + 1]
+            self.files.append((input_audio, mfcc, target_sample, onehot_target))
+        else:
+            self.files.append((input_audio, mfcc, target_sample))
 
         if torch.max(mfcc) > self.mfcc_max:
             self.mfcc_max = torch.max(mfcc)
@@ -100,10 +105,19 @@ class WVDataset(Dataset):
         return len(self.files)
 
     def __getitem__(self, idx):
-        onehot, mfcc, target = self.files[idx]
+        onehot= 0
+        mfcc = 0
+        target = 0
+        oht = 0
+        if self.is_generating:
+            onehot, mfcc, target, oht = self.files[idx]
+            return onehot.type(torch.LongTensor), mfcc.type(torch.FloatTensor), target.type(torch.LongTensor), oht.type(torch.FloatTensor)
+        else:
+            onehot, mfcc, target = self.files[idx]
+            return onehot.type(torch.LongTensor), mfcc.type(torch.FloatTensor), target.type(torch.LongTensor), oht
         # mfcc = (mfcc - self.mfcc_min) / (self.mfcc_max - self.mfcc_min)
         # print('WVDATA target size:', target.type(torch.LongTensor).size())
-        return onehot.type(torch.LongTensor), mfcc.type(torch.FloatTensor), target.type(torch.LongTensor)
+        
         # return torch.unsqueeze(onehot, 0).type(torch.FloatTensor), mfcc.type(torch.FloatTensor), target.type(
             # torch.FloatTensor)
 

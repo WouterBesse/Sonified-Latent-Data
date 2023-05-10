@@ -4,10 +4,10 @@ from torch import nn, from_numpy
 from torch.utils.data import Dataset
 from torchaudio.transforms import MuLawEncoding, MFCC, Resample, MuLawDecoding
 import torchaudio
-# import models.WaveNetVAE.WaveVaeOperations as WOP
-# from models.WaveNetVAE.WaveVaeWavenet import Wavenet
-import WaveVaeOperations as WOP
-from WaveVaeWavenet import Wavenet
+import models.WaveNetVAE.WaveVaeOperations as WOP
+from models.WaveNetVAE.WaveVaeWavenet import Wavenet
+# import WaveVaeOperations as WOP
+# from WaveVaeWavenet import Wavenet
 from tqdm.auto import tqdm
 import random
 import numpy as np
@@ -268,7 +268,7 @@ class WaveNetVAE(nn.Module):
         print(audio_gen.size())
         audio2 = []
         first_loop = True
-        for batch_idx, (onehot_input, mfcc_input, target) in enumerate(tqdm(dataloader)):
+        for batch_idx, (onehot_input, mfcc_input, target, _) in enumerate(tqdm(dataloader)):
             
             if first_loop:
                 audio_gen = onehot_input.to(device)
