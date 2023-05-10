@@ -202,6 +202,7 @@ class WaveNetVAE(nn.Module):
         super(WaveNetVAE, self).__init__()
         
         self.out_channels = out_channels
+        self.softmax = nn.Softmax(dim=1)
 
         self.encoder = Encoder(
             input_size=input_size,
@@ -262,6 +263,10 @@ class WaveNetVAE(nn.Module):
 
         return x_hat, mean, log_var
     
+    def sample_value(self, x):
+        probs = self.softmax(x[:, :, -1])
+        return torch.argmax(probs)
+    
     def inference(self, dataloader, size = 4096, device='cuda'):
 
         audio_gen = torch.zeros(1, 1, size).to(device)
@@ -274,16 +279,19 @@ class WaveNetVAE(nn.Module):
                 audio_gen = onehot_input.to(device)
                 snippet_gen, _, _ = self.forward(onehot_input.to(device), mfcc_input.to(device), False)
                 if self.out_channels == 256:
-                    snippet_gen = torch.argmax(snippet_gen[:, :, -1])
+                    snippet_gen = self.sample_value(snippet_gen)
 
                 print(audio_gen.size(), snippet_gen.unsqueeze(0).unsqueeze(0).size())
                 audio_gen = torch.cat((audio_gen, snippet_gen.unsqueeze(0).unsqueeze(0)), 1)
                 # audio_gen = snippet_gen
                 first_loop = False
             else:
+                print(audio_gen[:, -4096:][:, -5:-1].detach().cpu())
+                print(audio_gen[:, -4096:].size())
                 snippet_gen, _, _ = self.forward(audio_gen[:, -4096:], mfcc_input.to(device), False)
                 if self.out_channels == 256:
-                    snippet_gen = torch.argmax(snippet_gen[:, :, -1])
+                    snippet_gen = self.sample_value(snippet_gen)
+                print(snippet_gen.item())
                 audio_gen = torch.cat((audio_gen, snippet_gen.unsqueeze(0).unsqueeze(0)), 1)
 
 #         if self.out_channels == 256:
