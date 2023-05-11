@@ -70,11 +70,11 @@ class Wavenet(nn.Module):
         print("WaveNet Receptive Field: ", self.receptive_field)
         
         self.final_convs = nn.Sequential(
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(negative_slope=0.1, inplace=True),
             nn.Conv1d(skip_channels,
                       skip_channels,
                       kernel_size = 1),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(negative_slope=0.01, inplace=True),
             # nn.Dropout(p=0.05),
             nn.Conv1d(in_channels = skip_channels, 
                       out_channels = out_channels, 
@@ -95,7 +95,7 @@ class Wavenet(nn.Module):
                 self.upsample_conv.append(convt)
                 # assuming we use [0, 1] scaled features
                 # this should avoid non-negative upsampling output
-                self.upsample_conv.append(nn.ReLU(inplace = True))
+                self.upsample_conv.append(nn.LeakyReLU(negative_slope=0.1, inplace = True))
                 
             self.upsample_conv_seq = nn.Sequential(*self.upsample_conv) 
         else:
