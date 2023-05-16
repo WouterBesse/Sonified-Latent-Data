@@ -52,7 +52,7 @@ I gave it one extra linear layer to help reducing the data to a smaller latent s
 
 #### Training and model
 
-My model is downloadable from 'n.b.t.', it's trained on the TCGA dataset. You can train your own model using `train.py` from the Tybalt model folder or by using the `TybaltPlayground.ipynb` jupyter notebook.
+My model is downloadable from the releases section, it's trained on the TCGA dataset. You can train your own model using `train.py` from the Tybalt model folder or by using the `TybaltPlayground.ipynb` jupyter notebook.
 The acquisition and preprocessing scripts are available in the original [Tybalt GitHub](https://github.com/greenelab/tybalt).
 
 Example usage of CLI train.py: 
