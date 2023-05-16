@@ -22,9 +22,9 @@ class TybaltDataset(Dataset):
         print("Loaded data of size: ", self.data.size())
 
     def __len__(self):
-        return len(self.files)
+        return self.data.size()[0]
     
     def __getitem__(self, idx):
-        return self.data[idx]
+        return self.data[idx].type(torch.FloatTensor)
         
 

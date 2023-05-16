@@ -72,8 +72,8 @@ class TybaltVAE(nn.Module):
             mean (Tensor): Mean of latent space, shape (B x zsize)
             var (Tensor): Variance of latent space, shape (B x zsize)
         """
-        mean, log_var = self.encoder(x, verbose)
+        mean, log_var = self.encoder(x)
         z = self.sample(mean, log_var)
-        x_hat = self.decoder(z, verbose)
+        x_hat = self.decoder(z)
 
         return x_hat, mean, log_var
