@@ -45,7 +45,31 @@ example usage of CLI train.py:
 
 ### Tybalt WaveNet VAE
 
-T.B.D.
+A alteration on the [Tybalt VAE model](https://github.com/greenelab/tybalt) by [Way et al.](https://www.biorxiv.org/content/10.1101/174474v2).
+I gave it one extra linear layer to help reducing the data to a smaller latent space.
+
+![Tybalt VAE Diagram](https://github.com/WouterBesse/Sonified-Latent-Data/blob/main/media/Tybalt.svg?raw=true)
+
+#### Training and model
+
+My model is downloadable from 'n.b.t.', it's trained on the TCGA dataset. You can train your own model using `train.py` from the WaveNetVAE folder or by using the `WaveVaePlayground.ipynb` jupyter notebook.
+The acquisition and preprocessing scripts are available in the original [Tybalt GitHub](https://github.com/greenelab/tybalt).
+
+example usage of CLI train.py: 
+
+`python3 train.py -tp "./traindatasetfolder/" -vp "./validationdatasetfolder/" -ep 100`
+| **Short Flag** | **Long Flag**       | **Description**                                                                       |
+|----------------|---------------------|---------------------------------------------------------------------------------------|
+| `-dp`          | `--data_path`       | Path of folder where training data is stored, validation split is made automatically. |
+| `-ep`          | `--epochs`          | Amount of epochs to train                                                             |
+| `-ex`          | `--export_path`     | Path of folder to export model files to                                               |
+| `-bs`          | `--batch_size`      | Batch size                                                                            |
+| `-lr`          | `--learning_rate`   | Learning rate, I recommend 0.00001                                                    |
+| `-kla`         | `--kl_anneal`       | How much the kl rate multiplier is increased after every log step                     |
+| `-mkl`         | `--max_kl`          | What the maximum kl rate multiplier will be                                           |
+| `-lpe`         | `--logs_per_epoch`  | How often a tensorboard log is stored per epoch                                       |
+| `-d`           | `--device`          | What device to train on, e.g. `cuda:0`, `cpu`                                         |
+| `-mf`          | `--max_files`       | The maximum amount of files to use in the train dataset                               |
 
 ### Mocap WaveNet VAE
 
