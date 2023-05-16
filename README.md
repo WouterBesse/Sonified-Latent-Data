@@ -25,7 +25,7 @@ I decided to go with a normal VAE and not the quantized variant because it allow
 
 My model is downloadable from 'n.b.t.', I trained it on the LJSpeech dataset. You can train your own model using `train.py` from the WaveNetVAE folder or by using the `WaveVaePlayground.ipynb` jupyter notebook.
 
-example usage of CLI train.py: 
+Example usage of CLI train.py: 
 
 `python3 train.py -tp "./traindatasetfolder/" -vp "./validationdatasetfolder/" -ep 100`
 | **Short Flag** | **Long Flag**       | **Description**                                                   |
@@ -52,12 +52,12 @@ I gave it one extra linear layer to help reducing the data to a smaller latent s
 
 #### Training and model
 
-My model is downloadable from 'n.b.t.', it's trained on the TCGA dataset. You can train your own model using `train.py` from the WaveNetVAE folder or by using the `WaveVaePlayground.ipynb` jupyter notebook.
+My model is downloadable from 'n.b.t.', it's trained on the TCGA dataset. You can train your own model using `train.py` from the Tybalt model folder or by using the `TybaltPlayground.ipynb` jupyter notebook.
 The acquisition and preprocessing scripts are available in the original [Tybalt GitHub](https://github.com/greenelab/tybalt).
 
-example usage of CLI train.py: 
+Example usage of CLI train.py: 
 
-`python3 train.py -tp "./traindatasetfolder/" -vp "./validationdatasetfolder/" -ep 100`
+`python3 train.py -dp "./traindatasetfolder/" -ep 100`
 | **Short Flag** | **Long Flag**       | **Description**                                                                       |
 |----------------|---------------------|---------------------------------------------------------------------------------------|
 | `-dp`          | `--data_path`       | Path of folder where training data is stored, validation split is made automatically. |
