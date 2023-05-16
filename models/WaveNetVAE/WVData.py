@@ -25,8 +25,13 @@ class WVDataset(Dataset):
         self.mfcc = torchaudio.transforms.MFCC(
             sample_rate=sample_rate,
             n_mfcc=40,
-            melkwargs={"hop_length": hop_length}
+            melkwargs={"hop_length": hop_length, "n_mels": 40}
         )
+        # self.mfcc = torchaudio.transforms.MFCC(
+        #     sample_rate=sample_rate,
+        #     n_mfcc=40,
+        #     melkwargs={"hop_length": hop_length}
+        # )
 
         path_list = os.listdir(audio_path)
         self.mfcc_max = 0
@@ -47,8 +52,8 @@ class WVDataset(Dataset):
                 i = 0
 
                 if is_generating:
-                    with tqdm(total=4096, leave=False) as pbar:
-                        for i in range(4096):
+                    with tqdm(total=4096*4, leave=False) as pbar:
+                        for i in range(4096*4):
                             self.get_snippets(mulaw_audio, onehot_wave, norm_audio,i)
                             i += self.skip_size
                             pbar.update(1)

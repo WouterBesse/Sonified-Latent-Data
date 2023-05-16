@@ -268,41 +268,47 @@ class WaveNetVAE(nn.Module):
 
         return x_hat.to(self.devices[0]), mean.to(self.devices[0]), log_var.to(self.devices[0])
     
-    def sample_value(self, x):
+    def sample_value(self, x, device):
+        # print(x[:, :, -1].size())
         probs = self.softmax(x[:, :, -1])
-        return torch.argmax(probs)
+        # print(probs.size())
+        max_prob = torch.argmax(probs,dim=1)
+        
+        max_prob = max_prob + ((1**0.5)*torch.randn(1)).type(torch.LongTensor).to(device)
+        # print(max_prob.size())
+        return max_prob
     
     def inference(self, dataloader, size = 4096, device='cuda'):
 
-        audio_gen = torch.zeros(1, 1, size).to(device)
+        audio_gen = torch.zeros(1, 1, size).to(device[0])
         print(audio_gen.size())
         audio2 = []
         first_loop = True
         for batch_idx, (onehot_input, mfcc_input, target, _) in enumerate(tqdm(dataloader)):
             
             if first_loop:
-                audio_gen = onehot_input.to(device)
-                snippet_gen, _, _ = self.forward(onehot_input.to(device), mfcc_input.to(device), False)
+                audio_gen = onehot_input.to(device[0])
+                snippet_gen, _, _ = self.forward(onehot_input.to(device[0]), mfcc_input.to(device[0]), False)
                 if self.out_channels == 256:
-                    snippet_gen = self.sample_value(snippet_gen)
+                    snippet_gen = self.sample_value(snippet_gen, device[0])
 
                 # print(audio_gen.size(), snippet_gen.unsqueeze(0).unsqueeze(0).size())
-                audio_gen = torch.cat((audio_gen, snippet_gen.unsqueeze(0).unsqueeze(0)), 1)
+                audio_gen = torch.cat((audio_gen, snippet_gen.unsqueeze(0)), 1)
                 # audio_gen = snippet_gen
                 first_loop = False
             else:
                 # print("Gen: ", audio_gen[:, -4096:][:, -5:-1].detach().cpu())
                 # print("One: ", onehot_input[:, -5:-1].detach().cpu())
-                print("Gen: ", audio_gen[:, -4096:].detach().cpu().size())
-                print("One: ", onehot_input.detach().cpu().size())
-                print("========")
+                # print("Gen: ", audio_gen[:, -4096:].detach().cpu().size())
+                # print("One: ", onehot_input.detach().cpu().size())
+                # print("========")
                 # print(audio_gen[:, -4096:].size())
-                snippet_gen, _, _ = self.forward(onehot_input.to(device), mfcc_input.to(device), False)
+                snippet_gen, _, _ = self.forward(audio_gen.to(device[0]).type(torch.LongTensor)[:, -4096:], mfcc_input.to(device[0]), False)
                 # snippet_gen, _, _ = self.forward(audio_gen[:, -4096:], mfcc_input.to(device), False)
                 if self.out_channels == 256:
-                    snippet_gen = self.sample_value(snippet_gen)
+                    snippet_gen = self.sample_value(snippet_gen, device[0])
                 # print(snippet_gen.item())
-                audio_gen = torch.cat((audio_gen, snippet_gen.unsqueeze(0).unsqueeze(0)), 1)
+                audio_gen = torch.cat((audio_gen, snippet_gen.unsqueeze(0)), 1)
 
 #         if self.out_channels == 256:
 #             audio_gen = self.mudec(audio_gen)
