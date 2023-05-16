@@ -28,17 +28,19 @@ My model is downloadable from 'n.b.t.', I trained it on the LJSpeech dataset. Yo
 example usage of CLI train.py: 
 
 `python3 train.py -tp "./traindatasetfolder/" -vp "./validationdatasetfolder/" -ep 100`
-- `-tp`  | `--train_path` path of folder where training audio data is stored
-- `-vp`  | `--validation_path` path of folder where validation audio data is stored
-- `-ep`  | `--epochs` amount of epochs to train
-- `-ex`  | `--export_path` path of folder to export model files to
-- `-bs`  | `--batch_size` batch size
-- `-lr`  | `--learning_rate` learning rate, I recommend 0.00001
-- `-kla` | `--kl_anneal` how much the kl rate multiplier is increased after every log step
-- `-mkl` | `--max_kl` what the maximum kl rate multiplier will be
-- `-lpe` | `--logs_per_epoch` how often a tensorboard log is stored per epoch
-- `-d`   | `--device` what device to train on, e.g. `cuda:0`, `cpu`
-- `-mf`  | `--max_files` the maximum amount of files to use in the train dataset
+| **Short Flag** | **Long Flag**       | **Description**                                                   |
+|----------------|---------------------|-------------------------------------------------------------------|
+| `-tp`          | `--train_path`      | Path of folder where training audio data is stored                |
+| `-vp`          | `--validation_path` | Path of folder where validation audio data is stored              |
+| `-ep`          | `--epochs`          | Amount of epochs to train                                         |
+| `-ex`          | `--export_path`     | Path of folder to export model files to                           |
+| `-bs`          | `--batch_size`      | Batch size                                                        |
+| `-lr`          | `--learning_rate`   | Learning rate, I recommend 0.00001                                |
+| `-kla`         | `--kl_anneal`       | How much the kl rate multiplier is increased after every log step |
+| `-mkl`         | `--max_kl`          | What the maximum kl rate multiplier will be                       |
+| `-lpe`         | `--logs_per_epoch`  | How often a tensorboard log is stored per epoch                   |
+| `-d`           | `--device`          | What device to train on, e.g. `cuda:0`, `cpu`                     |
+| `-mf`          | `--max_files`       | The maximum amount of files to use in the train dataset           |
 
 
 ### Tybalt WaveNet VAE
