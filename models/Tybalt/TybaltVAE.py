@@ -5,7 +5,7 @@ def linear_block(input_size, output_size):
     block = nn.Sequential(
         nn.Linear(input_size, output_size),
         nn.BatchNorm1d(output_size),
-        nn.ReLU())
+        nn.LeakyReLU(0.1))
     return block
 
 class Decoder(nn.Module):
@@ -16,7 +16,7 @@ class Decoder(nn.Module):
         self.decode = nn.Sequential(
             nn.Linear(zsize, 1000),
             nn.Sigmoid(),
-            nn.Linear(output_size),
+            nn.Linear(1000, output_size),
             nn.Sigmoid()
         )
 
@@ -72,8 +72,8 @@ class TybaltVAE(nn.Module):
             mean (Tensor): Mean of latent space, shape (B x zsize)
             var (Tensor): Variance of latent space, shape (B x zsize)
         """
-        mean, log_var = self.encoder(x, verbose)
+        mean, log_var = self.encoder(x)
         z = self.sample(mean, log_var)
-        x_hat = self.decoder(z, verbose)
+        x_hat = self.decoder(z)
 
         return x_hat, mean, log_var
