@@ -5,7 +5,7 @@ def linear_block(input_size, output_size):
     block = nn.Sequential(
         nn.Linear(input_size, output_size),
         nn.BatchNorm1d(output_size),
-        nn.ReLU())
+        nn.LeakyReLU(0.1))
     return block
 
 class Decoder(nn.Module):
