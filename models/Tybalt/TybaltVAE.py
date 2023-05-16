@@ -16,7 +16,7 @@ class Decoder(nn.Module):
         self.decode = nn.Sequential(
             nn.Linear(zsize, 1000),
             nn.Sigmoid(),
-            nn.Linear(output_size),
+            nn.Linear(1000, output_size),
             nn.Sigmoid()
         )
 
