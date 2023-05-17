@@ -14,12 +14,15 @@ A lot of earlier experiments relevant to this project I tried using the WaveNet 
 - Datasets will are listed at the end of this readme
 
 ## Models
+
 ### Standard WaveNet VAE
+
+<img src="https://github.com/WouterBesse/Sonified-Latent-Data/blob/main/media/WaveNetVae.jpg?raw=true" align="right" width="430px" alt="WaveNet VAE Diagram" />
 
 This model is very similar to the one described by [Chorowski et al.](https://arxiv.org/abs/1901.08810) and follows the following model:
 I decided to go with a normal VAE and not the quantized variant because it allows me to more easily interpolate and play with the latent space.
 
-![WaveNet VAE Diagram](https://github.com/WouterBesse/Sonified-Latent-Data/blob/main/media/WaveNetVae.jpg?raw=true)
+
 
 #### Training and model
 
@@ -28,27 +31,25 @@ My model is downloadable from 'n.b.t.', I trained it on the LJSpeech dataset. Yo
 Example usage of CLI train.py: 
 
 `python3 train.py -tp "./traindatasetfolder/" -vp "./validationdatasetfolder/" -ep 100`
-| **Short Flag** | **Long Flag**       | **Description**                                                   |
-|----------------|---------------------|-------------------------------------------------------------------|
-| `-tp`          | `--train_path`      | Path of folder where training audio data is stored                |
-| `-vp`          | `--validation_path` | Path of folder where validation audio data is stored              |
-| `-ep`          | `--epochs`          | Amount of epochs to train                                         |
-| `-ex`          | `--export_path`     | Path of folder to export model files to                           |
-| `-bs`          | `--batch_size`      | Batch size                                                        |
-| `-lr`          | `--learning_rate`   | Learning rate, I recommend 0.00001                                |
-| `-kla`         | `--kl_anneal`       | How much the kl rate multiplier is increased after every log step |
-| `-mkl`         | `--max_kl`          | What the maximum kl rate multiplier will be                       |
-| `-lpe`         | `--logs_per_epoch`  | How often a tensorboard log is stored per epoch                   |
-| `-d`           | `--device`          | What device to train on, e.g. `cuda:0`, `cpu`                     |
-| `-mf`          | `--max_files`       | The maximum amount of files to use in the train dataset           |
+| **Short Flag** | **Long Flag**       | **Description**                    |
+|----------------|---------------------|------------------------------------|
+| `-tp`          | `--train_path`      | Path of training data              |
+| `-vp`          | `--validation_path` | Path of validation data            |
+| `-ep`          | `--epochs`          | Amount of epochs to train          |
+| `-ex`          | `--export_path`     | Model export location              |
+| `-bs`          | `--batch_size`      | Batch size                         |
+| `-lr`          | `--learning_rate`   | Learning rate                      |
+| `-kla`         | `--kl_anneal`       | KL multiplier increase per step    |
+| `-mkl`         | `--max_kl`          | Maximum KL multiplier              |
+| `-lpe`         | `--logs_per_epoch`  | Validation frequency               |
+| `-d`           | `--device`          | Train device, e.g. `cuda:0`, `cpu` |
+| `-mf`          | `--max_files`       | Maximum amount of files in dataset |
 
-
+---
 ### Tybalt WaveNet VAE
-
+<img src="https://github.com/WouterBesse/Sonified-Latent-Data/blob/main/media/Tybalt.svg?raw=true" align="right" width="430px" alt="Tybalt VAE Diagram" />
 A alteration on the [Tybalt VAE model](https://github.com/greenelab/tybalt) by [Way et al.](https://www.biorxiv.org/content/10.1101/174474v2).
 I gave it one extra linear layer to help reducing the data to a smaller latent space.
-
-![Tybalt VAE Diagram](https://github.com/WouterBesse/Sonified-Latent-Data/blob/main/media/Tybalt.svg?raw=true)
 
 #### Training and model
 
@@ -58,19 +59,19 @@ The acquisition and preprocessing scripts are available in the original [Tybalt 
 Example usage of CLI train.py: 
 
 `python3 train.py -dp "./traindatasetfolder/" -ep 100`
-| **Short Flag** | **Long Flag**       | **Description**                                                                       |
-|----------------|---------------------|---------------------------------------------------------------------------------------|
-| `-dp`          | `--data_path`       | Path of folder where training data is stored, validation split is made automatically. |
-| `-ep`          | `--epochs`          | Amount of epochs to train                                                             |
-| `-ex`          | `--export_path`     | Path of folder to export model files to                                               |
-| `-bs`          | `--batch_size`      | Batch size                                                                            |
-| `-lr`          | `--learning_rate`   | Learning rate, I recommend 0.00001                                                    |
-| `-kla`         | `--kl_anneal`       | How much the kl rate multiplier is increased after every log step                     |
-| `-mkl`         | `--max_kl`          | What the maximum kl rate multiplier will be                                           |
-| `-lpe`         | `--logs_per_epoch`  | How often a tensorboard log is stored per epoch                                       |
-| `-d`           | `--device`          | What device to train on, e.g. `cuda:0`, `cpu`                                         |
-| `-mf`          | `--max_files`       | The maximum amount of files to use in the train dataset                               |
-
+| **Short Flag** | **Long Flag**       | **Description**                    |
+|----------------|---------------------|------------------------------------|
+| `-dp`          | `--data_path`       | Path of all data                   |
+| `-ep`          | `--epochs`          | Amount of epochs to train          |
+| `-ex`          | `--export_path`     | Model export location              |
+| `-bs`          | `--batch_size`      | Batch size                         |
+| `-lr`          | `--learning_rate`   | Learning rate                      |
+| `-kla`         | `--kl_anneal`       | KL multiplier increase per step    |
+| `-mkl`         | `--max_kl`          | Maximum KL multiplier              |
+| `-lpe`         | `--logs_per_epoch`  | Validation frequency               |
+| `-d`           | `--device`          | Train device, e.g. `cuda:0`, `cpu` |
+| `-mf`          | `--max_files`       | Maximum amount of files in dataset |
+---
 ### Mocap WaveNet VAE
 
 
