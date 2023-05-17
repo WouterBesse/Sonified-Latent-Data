@@ -22,16 +22,19 @@ class WVDataset(Dataset):
         self.skip_size = skip_size
         self.mulaw = torchaudio.transforms.MuLawEncoding(quantization_channels=256)
         self.is_generating = is_generating
+        self.sr = sample_rate
         # self.mfcc = torchaudio.transforms.MFCC(
         #     sample_rate=sample_rate,
         #     n_mfcc=13,
-        #     melkwargs={"win_length": win_length, "hop_length": 160, "n_mels": 40}
+        #     melkwargs={"win_length": win_length, "hop_length": 100, "n_mels": 40}
         # )
         self.mfcc = torchaudio.transforms.MFCC(
             sample_rate=sample_rate,
             n_mfcc=40,
-            melkwargs={"hop_length": 128, "n_mels": 40}
+            melkwargs={"hop_length": 128, "n_mels": 64}
         )
+        
+        self.deltagen = torchaudio.transforms.ComputeDeltas(win_length= 9)
 
         path_list = os.listdir(audio_path)
         self.mfcc_max = 0
@@ -52,8 +55,8 @@ class WVDataset(Dataset):
                 i = 0
 
                 if is_generating:
-                    with tqdm(total=4096*4, leave=False) as pbar:
-                        for i in range(4096*4):
+                    with tqdm(total=4096*2, leave=False) as pbar:
+                        for i in range(4096*2):
                             self.get_snippets(mulaw_audio, onehot_wave, norm_audio,i)
                             i += self.skip_size
                             pbar.update(1)
@@ -82,9 +85,16 @@ class WVDataset(Dataset):
 
         return audio, norm_audio, mulawq
 
-    def process_mfcc(self, audio):
-        mfcc = self.mfcc(audio)
-        mfcc /= torch.max(mfcc)
+    def process_mfcc(self, y):
+        mfcc = self.mfcc(y)
+        # mfcc = torch.from_numpy(librosa.feature.mfcc(y=y.numpy(), sr=self.sr, hop_length= 128))
+        mfcc_delta = self.deltagen(mfcc)
+        mfcc_delta2 = self.deltagen(mfcc_delta)
+        mfcc = torch.cat((mfcc, mfcc_delta), dim=0)
+        mfcc = torch.cat((mfcc, mfcc_delta2), dim=0)
+        
+        
+        # mfcc /= torch.max(mfcc)
 
         return mfcc
     
