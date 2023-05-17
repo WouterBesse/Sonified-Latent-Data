@@ -47,8 +47,10 @@ Example usage of CLI train.py:
 
 ---
 ### Tybalt WaveNet VAE
+
 <img src="https://github.com/WouterBesse/Sonified-Latent-Data/blob/main/media/Tybalt.svg?raw=true" align="right" width="430px" alt="Tybalt VAE Diagram" />
-A alteration on the [Tybalt VAE model](https://github.com/greenelab/tybalt) by [Way et al.](https://www.biorxiv.org/content/10.1101/174474v2).
+
+A alteration on the [Tybalt VAE model](https://github.com/greenelab/tybalt) by [Way et al.](https://www.biorxiv.org/content/10.1101/174474v2)
 I gave it one extra linear layer to help reducing the data to a smaller latent space.
 
 #### Training and model
