@@ -15,23 +15,23 @@ AUDIO_EXTENSIONS = [
 
 class WVDataset(Dataset):
 
-    def __init__(self, audio_path, length, skip_size, sample_rate, max_files=0, hop_length=160, is_generating = False):
+    def __init__(self, audio_path, length, skip_size, sample_rate, max_files=0, win_length=400, is_generating = False):
         super(WVDataset, self).__init__()
 
         self.length = length
         self.skip_size = skip_size
         self.mulaw = torchaudio.transforms.MuLawEncoding(quantization_channels=256)
         self.is_generating = is_generating
+        # self.mfcc = torchaudio.transforms.MFCC(
+        #     sample_rate=sample_rate,
+        #     n_mfcc=13,
+        #     melkwargs={"win_length": win_length, "hop_length": 160, "n_mels": 40}
+        # )
         self.mfcc = torchaudio.transforms.MFCC(
             sample_rate=sample_rate,
             n_mfcc=40,
-            melkwargs={"hop_length": hop_length, "n_mels": 40}
+            melkwargs={"hop_length": 128, "n_mels": 40}
         )
-        # self.mfcc = torchaudio.transforms.MFCC(
-        #     sample_rate=sample_rate,
-        #     n_mfcc=40,
-        #     melkwargs={"hop_length": hop_length}
-        # )
 
         path_list = os.listdir(audio_path)
         self.mfcc_max = 0

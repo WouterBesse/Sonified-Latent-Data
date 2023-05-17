@@ -268,15 +268,40 @@ class WaveNetVAE(nn.Module):
 
         return x_hat.to(self.devices[0]), mean.to(self.devices[0]), log_var.to(self.devices[0])
     
-    def sample_value(self, x, device):
+    def sample_value(self, x, device, quantization_channels=256):
         # print(x[:, :, -1].size())
-        probs = self.softmax(x[:, :, -1])
-        # print(probs.size())
-        max_prob = torch.argmax(probs,dim=1)
+        pdf = self.softmax(x[:, :, -1]).to(device)
         
-        max_prob = max_prob + ((1**0.5)*torch.randn(1)).type(torch.LongTensor).to(device)
+        cdf = torch.cumsum(pdf, dim=1).to(device)
+        batch_size = cdf.size()[0]
+        sample_prob = torch.rand(batch_size).to(device)
+        pred = torch.zeros(batch_size, dtype=torch.float32).to(device)
+        
+        for i, prob in enumerate(sample_prob):
+            # pred[i] = cdf[i].searchsorted(prob)
+            pred[i] = torch.searchsorted(cdf[i], prob)
+        # print(probs.size())
+        # max_prob = torch.argmax(probs,dim=1).to(device)
+        
+        # max_prob = max_prob + ((1**0.5)*torch.randn(1)).type(torch.LongTensor).to(device)
         # print(max_prob.size())
-        return max_prob
+        return pred
+    
+    # def sample(pdf, quantization_channels=256):
+    # ''' sample from pdf
+    # args:
+    #     pdf: pdf, shape [b, quantization_channels]
+    # returns:
+    #     sampled and mu_law decoded, shape [b], in range [-1, 1]
+    # '''
+    # cdf = torch.cumsum(pdf, dim=1)
+    # batch_size = cdf.shape[0]
+    # sample_prob = np.random.rand(batch_size)
+    # pred = np.zeros(batch_size, dtype=np.float32)
+    # for i, prob in enumerate(sample_prob):
+    #     pred[i] = cdf[i].searchsorted(prob)
+    # decoded = mu_law_decode_np(pred, quantization_channels=quantization_channels)
+    # return decoded
     
     def inference(self, dataloader, size = 4096, device='cuda'):
 
