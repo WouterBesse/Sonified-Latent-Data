@@ -176,7 +176,7 @@ if __name__ == '__main__':
 
     batchsize = args.batch_size
     device = args.device
-    input_size = (40, 112)
+    input_size = (60, 112)
     upsamples = [2, 2, 2, 2, 2, 2, 2, 2]
     zsize = 32
 
