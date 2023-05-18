@@ -85,7 +85,7 @@ def train(model, dataloader_train, dataloader_val, writer, export_path, learning
     # loss_fn = torch.nn.MSELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     logstep = 0
-    kl_mult = 0.0
+    kl_mult = 0.001
     total_step = 0
     
 

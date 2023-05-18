@@ -30,7 +30,7 @@ class WVDataset(Dataset):
         # )
         self.mfcc = torchaudio.transforms.MFCC(
             sample_rate=sample_rate,
-            n_mfcc=40,
+            n_mfcc=30,
             melkwargs={"hop_length": 128, "n_mels": 64}
         )
         
@@ -91,7 +91,7 @@ class WVDataset(Dataset):
         mfcc_delta = self.deltagen(mfcc)
         mfcc_delta2 = self.deltagen(mfcc_delta)
         mfcc = torch.cat((mfcc, mfcc_delta), dim=0)
-        mfcc = torch.cat((mfcc, mfcc_delta2), dim=0)
+        # mfcc = torch.cat((mfcc, mfcc_delta2), dim=0)
         
         
         # mfcc /= torch.max(mfcc)
