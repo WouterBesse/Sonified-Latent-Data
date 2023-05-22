@@ -131,7 +131,7 @@ class ResidualConv1dGLU(nn.Module):
         a, b = x.split(x.size(self.splitdim) // 2, dim=self.splitdim) # Get filter and gate
 
         # local conditioning
-        ca, cb = c.split(condition.size(self.splitdim) // 2, dim=self.splitdim) # Get filter and gate from condition
+        ca, cb = condition.split(condition.size(self.splitdim) // 2, dim=self.splitdim) # Get filter and gate from condition
         filt, gate = a + ca, b + cb # Combine filters and gates
 
         x = torch.tanh(filt) * torch.sigmoid(gate)
