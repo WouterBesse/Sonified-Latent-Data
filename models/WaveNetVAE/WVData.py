@@ -15,7 +15,7 @@ AUDIO_EXTENSIONS = [
 
 class WVDataset(Dataset):
 
-    def __init__(self, audio_path, length, skip_size, sample_rate, max_files=0, win_length=400, is_generating = False):
+    def __init__(self, audio_path, length, skip_size, sample_rate, max_files=0, is_generating = False):
         super(WVDataset, self).__init__()
 
         self.length = length
@@ -23,18 +23,6 @@ class WVDataset(Dataset):
         self.mulaw = torchaudio.transforms.MuLawEncoding(quantization_channels=256)
         self.is_generating = is_generating
         self.sr = sample_rate
-        # self.mfcc = torchaudio.transforms.MFCC(
-        #     sample_rate=sample_rate,
-        #     n_mfcc=13,
-        #     melkwargs={"win_length": win_length, "hop_length": 100, "n_mels": 40}
-        # )
-        self.mfcc = torchaudio.transforms.MFCC(
-            sample_rate=sample_rate,
-            n_mfcc=30,
-            melkwargs={"hop_length": 128, "n_mels": 64}
-        )
-        
-        self.deltagen = torchaudio.transforms.ComputeDeltas(win_length= 9)
 
         path_list = os.listdir(audio_path)
         self.mfcc_max = 0
@@ -50,16 +38,14 @@ class WVDataset(Dataset):
             if is_audio_file(full_path):
                 waveform = load_wav(full_path, sample_rate)
 
-                onehot_wave, norm_audio, mulaw_audio = self.process_audio(waveform)
+                mulaw_audio = self.process_audio(waveform)
                 
                 self.add_snippets(mulaw_audio)
-                
-                            
-                            
+                                            
 
     def process_audio(self, audio):
         """
-        Process, normalise, mulaw encode and one hot encode audio.
+        Process, normalise, mulaw encode audio
         """
         audio = torch.from_numpy(audio)
 
@@ -70,9 +56,9 @@ class WVDataset(Dataset):
         norm_audio = torch.clamp(norm_audio, -1.0, 1.0)
         
         mulawq = self.mulaw(norm_audio)
-        audio = F.one_hot(mulawq, 256)
+        # audio = F.one_hot(mulawq, 256)
 
-        return audio, norm_audio, mulawq
+        return mulawq
     
     def add_snippets(self, mulaw_audio):
         """
@@ -95,6 +81,10 @@ class WVDataset(Dataset):
 
 
 class ProcessWav(object):
+    """
+    Class to get MFCC+derivatives from audio snippet, used in Collate()
+    Sourced from: https://github.com/hrbigelow/ae-wavenet
+    """   
     def __init__(self, sample_rate=16000, win_sz=400, hop_sz=160, n_mels=80,
             n_mfcc=13, name=None):
         self.sample_rate = sample_rate
@@ -145,6 +135,10 @@ class ProcessWav(object):
         return mfcc_and_derivatives
 
 class Collate():
+    """
+    Collate class to return the right data
+    Sourced from: https://github.com/hrbigelow/ae-wavenet
+    """   
     def __init__(self, mfcc, train_mode = True):
         self.train_mode = train_mode
         self.mfcc = mfcc
@@ -168,14 +162,14 @@ Utility Functions
 
 def load_wav(filename, sampling_rate, res_type='kaiser_fast', top_db=20, trimming_duration=None):
     raw, _ = librosa.load(filename, sr=sampling_rate, res_type=res_type)
-    if trimming_duration is None:
-        trimmed_audio, trimming_indices = librosa.effects.trim(raw, top_db=top_db)
-        trimming_time = trimming_indices[0] / sampling_rate
-    else:
-        trimmed_audio = raw[int(trimming_duration * sampling_rate):]
-        trimming_time = trimming_duration
-    trimmed_audio /= np.abs(trimmed_audio).max()
-    trimmed_audio = trimmed_audio.astype(np.float32)
+    # if trimming_duration is None:
+    #     trimmed_audio, trimming_indices = librosa.effects.trim(raw, top_db=top_db)
+    #     trimming_time = trimming_indices[0] / sampling_rate
+    # else:
+    #     trimmed_audio = raw[int(trimming_duration * sampling_rate):]
+    #     trimming_time = trimming_duration
+    # trimmed_audio /= np.abs(raw).max()
+    trimmed_audio = raw.astype(np.float32)
 
     return trimmed_audio
 
