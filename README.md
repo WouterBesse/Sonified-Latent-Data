@@ -22,6 +22,11 @@ A lot of earlier experiments relevant to this project I tried using the WaveNet 
 This model is very similar to the one described by [Chorowski et al.](https://arxiv.org/abs/1901.08810) and follows the following model:
 I decided to go with a normal VAE and not the quantized variant because it allows me to more easily interpolate and play with the latent space.
 
+For the actual code I took inspriation, and sometimes flat out copied, from the following repositories:
+- [hrbigelow/ae-wavenet](https://github.com/hrbigelow/ae-wavenet)
+- [swasun/VQ-VAE-Speech](https://github.com/swasun/VQ-VAE-Speech)
+- [DongyaoZhu/VQ-VAE-WaveNet](https://github.com/DongyaoZhu/VQ-VAE-WaveNet)
+- [r9y9/wavenet_vocoder](https://github.com/r9y9/wavenet_vocoder)
 
 
 #### Training and model
