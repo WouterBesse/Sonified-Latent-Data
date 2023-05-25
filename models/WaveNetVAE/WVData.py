@@ -14,7 +14,9 @@ AUDIO_EXTENSIONS = [
 
 
 class WVDataset(Dataset):
-
+    """
+    Custom dataset that slices audio up and mulaw quantises it
+    """
     def __init__(self, audio_path, length, skip_size, sample_rate, max_files=0, is_generating = False):
         super(WVDataset, self).__init__()
 
@@ -23,10 +25,8 @@ class WVDataset(Dataset):
         self.mulaw = torchaudio.transforms.MuLawEncoding(quantization_channels=256)
         self.is_generating = is_generating
         self.sr = sample_rate
-
+        self.mfcc = ProcessWav()
         path_list = os.listdir(audio_path)
-        self.mfcc_max = 0
-        self.mfcc_min = 9999999999999
 
         if max_files != 0:
             path_list = path_list[0:max_files]
@@ -38,9 +38,9 @@ class WVDataset(Dataset):
             if is_audio_file(full_path):
                 waveform = load_wav(full_path, sample_rate)
 
-                mulaw_audio = self.process_audio(waveform)
+                mulaw_audio, norm_audio = self.process_audio(waveform)
                 
-                self.add_snippets(mulaw_audio)
+                self.add_snippets(mulaw_audio, norm_audio)
                                             
 
     def process_audio(self, audio):
@@ -58,9 +58,9 @@ class WVDataset(Dataset):
         mulawq = self.mulaw(norm_audio)
         # audio = F.one_hot(mulawq, 256)
 
-        return mulawq
+        return mulawq, norm_audio
     
-    def add_snippets(self, mulaw_audio):
+    def add_snippets(self, mulaw_audio, norm_audio):
         """
         Cut wave file in self.length sized pieces, skipping every
         """   
@@ -68,21 +68,21 @@ class WVDataset(Dataset):
 
         for i in trange(0, sampletotal, self.skip_size, leave=False):
             input_audio = mulaw_audio[i:i + self.length + 1]
-            self.files.append(input_audio)
+            mfcc = self.mfcc(norm_audio[i:i + self.length + 1])
+            self.files.append([input_audio, mfcc])
         return
-
 
     def __len__(self):
         return len(self.files)
 
     def __getitem__(self, idx):
-        snippet = self.files[idx]
-        return snippet.type(torch.FloatTensor)
+        snippet, mfcc = self.files[idx]
+        return snippet.type(torch.FloatTensor), mfcc.type(torch.FloatTensor)
 
 
 class ProcessWav(object):
     """
-    Class to get MFCC+derivatives from audio snippet, used in Collate()
+    Class to get MFCC+derivatives from audio snippet
     Sourced from: https://github.com/hrbigelow/ae-wavenet
     """   
     def __init__(self, sample_rate=16000, win_sz=400, hop_sz=160, n_mels=80,
@@ -132,28 +132,7 @@ class ProcessWav(object):
         mfcc_delta2 = librosa.feature.delta(mfcc_trim, order=2)
         mfcc_and_derivatives = np.concatenate((mfcc_trim, mfcc_delta, mfcc_delta2), axis=0)
 
-        return mfcc_and_derivatives
-
-class Collate():
-    """
-    Collate class to return the right data
-    Sourced from: https://github.com/hrbigelow/ae-wavenet
-    """   
-    def __init__(self, mfcc, train_mode = True):
-        self.train_mode = train_mode
-        self.mfcc = mfcc
-
-    def __call__(self, batch):
-        # print(len(batch))
-
-        wav = torch.stack([d for d in batch]).float()
-        mel = torch.stack([torch.from_numpy(self.mfcc(d)) for d in batch]).float()
-
-        if self.train_mode:
-            return wav, mel
-        else:
-            paths = [b[0][2] for b in batch]
-            return wav, mel
+        return torch.from_numpy(mfcc_and_derivatives)
             
 """
 Utility Functions

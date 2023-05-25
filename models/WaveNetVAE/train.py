@@ -12,6 +12,7 @@ from models.WaveNetVAE.WVData import WVDataset
 # from WVData import WVDataset
 import warnings
 from datetime import datetime
+import wandb
 
 def calculate_loss(output, target, mu, logvar, kl_term, loss_fn):
     # target = target = torch.unsqueeze(torch.unsqueeze(target[:, -1], 1), 1)
@@ -83,6 +84,7 @@ def train(model, dataloader_train, dataloader_val, writer, export_path, learning
     loss_fn = torch.nn.CrossEntropyLoss()
     # loss_fn = torch.nn.MSELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    wandb.watch(model, log="all", log_freq=1)
     logstep = 0
     kl_mult = 0.001
     total_step = 0
@@ -119,8 +121,8 @@ def train(model, dataloader_train, dataloader_val, writer, export_path, learning
 
                 t.set_description(
                     f"Training. Rec/real loss for step {step}: {round(rec_loss.item(), 2)}/{round(real_loss.item(), 2)}.")
-                writer.add_scalar('Train step loss:',
-                                  real_loss.item(), total_step)
+                # writer.add_scalar('Train step loss:',
+                #                   real_loss.item(), total_step)
                 step += 1
                 total_step += 1
                 divstep += 1
@@ -129,18 +131,26 @@ def train(model, dataloader_train, dataloader_val, writer, export_path, learning
 
                     eval_loss_real, eval_loss_rec, eval_loss_kl = validate(
                         model, dataloader_val, kl_mult, loss_fn, device, verbose)
+                    
+                    wandb.log({'epoch': epoch,
+                                'train_loss_comb': total_epoch_loss[0] / divstep,
+                                'train_loss_rec': total_epoch_loss[1] / divstep,
+                                'train_loss_kl': total_epoch_loss[2] / divstep,
+                                'val_loss_comb': eval_loss_real,
+                                'val_loss_rec': eval_loss_rec,
+                                'val_loss_kl': eval_loss_kl})
 
-                    writer.add_scalars('Validation Loss', {
-                        'Real loss': eval_loss_real,
-                        'Reconstruction loss': eval_loss_rec,
-                        'KL loss': eval_loss_kl
-                    }, logstep)
+#                     writer.add_scalars('Validation Loss', {
+#                         'Real loss': eval_loss_real,
+#                         'Reconstruction loss': eval_loss_rec,
+#                         'KL loss': eval_loss_kl
+#                     }, logstep)
 
-                    writer.add_scalars('Train loss', {
-                        'Real loss': total_epoch_loss[0] / divstep,
-                        'Reconstruction loss': total_epoch_loss[1] / divstep,
-                        'Kl loss': total_epoch_loss[2] / divstep
-                    }, logstep)
+#                     writer.add_scalars('Train loss', {
+#                         'Real loss': total_epoch_loss[0] / divstep,
+#                         'Reconstruction loss': total_epoch_loss[1] / divstep,
+#                         'Kl loss': total_epoch_loss[2] / divstep
+#                     }, logstep)
 
                     logstep += 1
                     total_epoch_loss = [0, 0, 0]
