@@ -37,7 +37,7 @@ class Decoder(nn.Module):
         (https://github.com/swasun/VQ-VAE-Speech/blob/master/src/models/wavenet_decoder.py#L50)
         """
         self.conv_1 = nn.Conv1d(in_channels=zsize,
-                                out_channels=768,
+                                out_channels=128,
                                 kernel_size=2,
                                 padding='same')
 
@@ -49,10 +49,10 @@ class Decoder(nn.Module):
             layers=10,
             stacks=2,
             out_channels=out_channels,
-            res_channels=768,
-            skip_channels=768,
+            res_channels=386,
+            skip_channels=386,
             gate_channels=768,
-            cond_channels=768,
+            cond_channels=128,
             kernel_size=3,
             upsample_conditional_features=True,
             upsample_scales=upsamples,
@@ -256,66 +256,52 @@ class WaveNetVAE(nn.Module):
             mean (Tensor): Mean of latent space, shape (B x zsize)
             var (Tensor): Variance of latent space, shape (B x zsize)
         """
-        mean, log_var = self.encoder(xspec.to(self.devices[0]), verbose)
+        mean, var = self.encoder(xspec.to(self.devices[0]), verbose)
 
         z = None
         if self.training:
-            z = self.samplenew(mean, log_var)
+            z = self.samplenew(mean, var)
         else:
             z = mean
 
         x_hat = self.decoder(xau.to(self.devices[1]), z.to(self.devices[1]), jitter, verbose)
 
-        return x_hat.to(self.devices[0]), mean.to(self.devices[0]), log_var.to(self.devices[0])
+        return x_hat.to(self.devices[0]), mean.to(self.devices[0]), var.to(self.devices[0])
     
-    def sample_value(self, x, device, quantization_channels=256):
-        # print(x[:, :, -1].size())
-        pdf = self.softmax(x[:, :, -1]).to(device)
-        
-        cdf = torch.cumsum(pdf, dim=1).to(device)
-        batch_size = cdf.size()[0]
-        sample_prob = torch.rand(batch_size).to(device)
-        pred = torch.zeros(batch_size, dtype=torch.float32).to(device)
-        
-        for i, prob in enumerate(sample_prob):
-            # pred[i] = cdf[i].searchsorted(prob)
-            pred[i] = torch.searchsorted(cdf[i], prob)
-        # print(probs.size())
-        # max_prob = torch.argmax(probs,dim=1).to(device)
-        
-        # max_prob = max_prob + ((1**0.5)*torch.randn(1)).type(torch.LongTensor).to(device)
-        # print(max_prob.size())
-        return pred
+    def sample_value(self, x, temperature = 1.0, device = 'cuda'):
+        x = x[:, :, -1]
+        if temperature > 0:
+            # sample from softmax distribution
+            x /= temperature
+            x = x.squeeze()
+            prob = torch.nn.functional.softmax(x, dim=0)
+            prob = prob.cpu().squeeze()
+            # print("prob size ",prob.size())
+            np_prob = prob.data.numpy()
+            # print("np_prob size ", np_prob.size())
+            x = np.random.choice(self.out_channels, p=np_prob)
+            x = np.array([x])
+        else:
+            # convert to sample value
+            x = torch.max(x, 0)[1][0]
+            x = x.cpu()
+            x = x.data.numpy()
+        return torch.from_numpy(x).to(device)
     
-    # def sample(pdf, quantization_channels=256):
-    # ''' sample from pdf
-    # args:
-    #     pdf: pdf, shape [b, quantization_channels]
-    # returns:
-    #     sampled and mu_law decoded, shape [b], in range [-1, 1]
-    # '''
-    # cdf = torch.cumsum(pdf, dim=1)
-    # batch_size = cdf.shape[0]
-    # sample_prob = np.random.rand(batch_size)
-    # pred = np.zeros(batch_size, dtype=np.float32)
-    # for i, prob in enumerate(sample_prob):
-    #     pred[i] = cdf[i].searchsorted(prob)
-    # decoded = mu_law_decode_np(pred, quantization_channels=quantization_channels)
-    # return decoded
     
-    def inference(self, dataloader, size = 4096, device='cuda'):
+    def inference(self, dataloader, size = 4096, device='cuda', temperature = 1.0):
 
         audio_gen = torch.zeros(1, 1, size).to(device[0])
         print(audio_gen.size())
         audio2 = []
         first_loop = True
-        for batch_idx, (onehot_input, mfcc_input, target, _) in enumerate(tqdm(dataloader)):
+        for batch_idx, (onehot_input, mfcc_input) in enumerate(tqdm(dataloader)):
             
             if first_loop:
-                audio_gen = onehot_input.to(device[0])
-                snippet_gen, _, _ = self.forward(onehot_input.to(device[0]), mfcc_input.to(device[0]), False)
+                audio_gen = onehot_input[...,:4096].to(device[0])
+                snippet_gen, _, _ = self.forward(onehot_input[...,:4096].to(device[0]).unsqueeze(1), mfcc_input.to(device[0]), True)
                 if self.out_channels == 256:
-                    snippet_gen = self.sample_value(snippet_gen, device[0])
+                    snippet_gen = self.sample_value(snippet_gen, temperature, device[0])
 
                 # print(audio_gen.size(), snippet_gen.unsqueeze(0).unsqueeze(0).size())
                 audio_gen = torch.cat((audio_gen, snippet_gen.unsqueeze(0)), 1)
@@ -328,10 +314,10 @@ class WaveNetVAE(nn.Module):
                 # print("One: ", onehot_input.detach().cpu().size())
                 # print("========")
                 # print(audio_gen[:, -4096:].size())
-                snippet_gen, _, _ = self.forward(audio_gen.to(device[0]).type(torch.LongTensor)[:, -4096:], mfcc_input.to(device[0]), False)
+                snippet_gen, _, _ = self.forward(audio_gen.to(device[0])[..., -4096:].unsqueeze(0), mfcc_input.to(device[0]), True)
                 # snippet_gen, _, _ = self.forward(audio_gen[:, -4096:], mfcc_input.to(device), False)
                 if self.out_channels == 256:
-                    snippet_gen = self.sample_value(snippet_gen, device[0])
+                    snippet_gen = self.sample_value(snippet_gen, temperature, device[0])
                 # print(snippet_gen.item())
                 audio_gen = torch.cat((audio_gen, snippet_gen.unsqueeze(0)), 1)
 
