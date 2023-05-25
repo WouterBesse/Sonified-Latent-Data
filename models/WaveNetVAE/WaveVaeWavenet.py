@@ -27,7 +27,7 @@ class Wavenet(nn.Module):
         #assert layers % stacks == 0
         self.upsample = upsample_conditional_features
 
-        self.first_conv = nn.Conv1d(in_channels = out_channels,
+        self.first_conv = nn.Conv1d(in_channels = 1,
                                     out_channels = res_channels, 
                                     kernel_size=1,
                                     dilation=1, 
@@ -75,7 +75,6 @@ class Wavenet(nn.Module):
                       skip_channels,
                       kernel_size = 1),
             nn.LeakyReLU(negative_slope=0.01, inplace=True),
-            # nn.Dropout(p=0.05),
             nn.Conv1d(in_channels = skip_channels, 
                       out_channels = out_channels, 
                       kernel_size = 1),
@@ -83,23 +82,12 @@ class Wavenet(nn.Module):
         )
 
         # Convolutions for upsampling latent space condition
-        self.upsample_conv_seq = nn.Sequential()
-        if upsample_conditional_features:
-            self.upsample_conv = []
-            for s in upsample_scales:
-                freq_axis_padding = (freq_axis_kernel_size - 1) // 2
-                convt = WOP.normalisedConvTranspose2d(1, 1, (freq_axis_kernel_size, s),
-                                        padding=(freq_axis_padding, 0),
-                                        dilation=1, stride=(1, s),
-                                        weight_normalization= True)
-                self.upsample_conv.append(convt)
-                # assuming we use [0, 1] scaled features
-                # this should avoid non-negative upsampling output
-                self.upsample_conv.append(nn.LeakyReLU(negative_slope=0.1, inplace = True))
-                
-            self.upsample_conv_seq = nn.Sequential(*self.upsample_conv) 
-        else:
-            self.upsample_conv = None
+        self.lc_upsample = nn.Sequential()
+        iterator = enumerate(zip([8, 6, 2, 2, 2, 2, 2, 2, 2], [2, 2, 2, 2, 2, 2, 2, 2, 2]))
+        for i, (filt_sz, stride) in iterator: 
+            name = f'Upsampling_{i}(filter_sz={filt_sz}, stride={stride})'
+            mod = WOP.Upsampling(128, filt_sz, stride, name=name)
+            self.lc_upsample.add_module(str(i), mod)
 
     def forward(self, x, c = None, verbose = False):
         """Forward step
@@ -116,11 +104,9 @@ class Wavenet(nn.Module):
         # B x 1 x C x T
         if verbose:
             print("Condition before upsampling: ", c.size())
-        c = c.unsqueeze(1)
-
-        c = self.upsample_conv_seq(c)
+            
+        c = self.lc_upsample(c)
         # B x C x T
-        c = c.squeeze(1)
 
         if verbose:
             print("Condition and x after c upsampling: ", c.size(), x.size())
@@ -128,16 +114,15 @@ class Wavenet(nn.Module):
         assert c.size(-1) == x.size(-1)
         
         # Feed data to network
-        # x = self.first_conv(x)
-        x = self.emb(x).transpose(1, 2)
+        x = self.first_conv(x)
+        # x = self.emb(x).transpose(1, 2)
         # skip = self.skip_conv(x)
         skips = 0
         for layer in self.conv_layers:
             x, s = layer(x, c)
             skips += s
-        # skips *= math.sqrt(1.0 / len(self.conv_layers))
+        skips *= math.sqrt(1.0 / len(self.conv_layers))
 
         x = skips
         x = self.final_convs(x)
         return x
-        

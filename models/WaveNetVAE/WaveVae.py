@@ -37,7 +37,7 @@ class Decoder(nn.Module):
         (https://github.com/swasun/VQ-VAE-Speech/blob/master/src/models/wavenet_decoder.py#L50)
         """
         self.conv_1 = nn.Conv1d(in_channels=zsize,
-                                out_channels=768,
+                                out_channels=128,
                                 kernel_size=2,
                                 padding='same')
 
@@ -49,10 +49,10 @@ class Decoder(nn.Module):
             layers=10,
             stacks=2,
             out_channels=out_channels,
-            res_channels=768,
-            skip_channels=768,
+            res_channels=386,
+            skip_channels=256,
             gate_channels=768,
-            cond_channels=768,
+            cond_channels=128,
             kernel_size=3,
             upsample_conditional_features=True,
             upsample_scales=upsamples,
@@ -248,11 +248,11 @@ class WaveNetVAE(nn.Module):
     def forward(self, xau, xspec, jitter, verbose = False):
         """Forward step
         Args:
-            xau (Tensor): Noisy audio, shape (B x 1 x T)
-            xspec (Tensor): Noisy MFCC, shape (B x features x timestpes)
+            xau (Tensor): Audio, shape (B x 1 x T)
+            xspec (Tensor): MFCC, shape (B x features x timestpes)
             jitter (Bool): To jitter the latent space condition or not
         Returns:
-            x_hat (Tensor): Clean audio, shape (B x 1 x T)
+            x_hat (Tensor): Reconstructed Audio, shape (B x 1 x T)
             mean (Tensor): Mean of latent space, shape (B x zsize)
             var (Tensor): Variance of latent space, shape (B x zsize)
         """
@@ -286,22 +286,6 @@ class WaveNetVAE(nn.Module):
         # max_prob = max_prob + ((1**0.5)*torch.randn(1)).type(torch.LongTensor).to(device)
         # print(max_prob.size())
         return pred
-    
-    # def sample(pdf, quantization_channels=256):
-    # ''' sample from pdf
-    # args:
-    #     pdf: pdf, shape [b, quantization_channels]
-    # returns:
-    #     sampled and mu_law decoded, shape [b], in range [-1, 1]
-    # '''
-    # cdf = torch.cumsum(pdf, dim=1)
-    # batch_size = cdf.shape[0]
-    # sample_prob = np.random.rand(batch_size)
-    # pred = np.zeros(batch_size, dtype=np.float32)
-    # for i, prob in enumerate(sample_prob):
-    #     pred[i] = cdf[i].searchsorted(prob)
-    # decoded = mu_law_decode_np(pred, quantization_channels=quantization_channels)
-    # return decoded
     
     def inference(self, dataloader, size = 4096, device='cuda'):
 

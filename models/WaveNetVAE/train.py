@@ -16,7 +16,7 @@ from datetime import datetime
 def calculate_loss(output, target, mu, logvar, kl_term, loss_fn):
     # target = target = torch.unsqueeze(torch.unsqueeze(target[:, -1], 1), 1)
     # print(output[:, -1:, :].size(), 
-    reconstruction_loss = loss_fn(output[:, -1], target[:, -1])
+    reconstruction_loss = loss_fn(output, target)
     # reconstruction_loss *= math.log2(math.e)
     kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
     kl_loss = torch.mean(kl_loss, dim = 0)
@@ -58,14 +58,13 @@ def validate(model, dataloader, kl_mult, loss_fn, device='cuda', verbose = False
     with torch.no_grad():
 
         with tqdm(enumerate(dataloader), total=len(dataloader), desc="Validating", colour='orange') as t:
-            for batch_idx, (onehot_input, mfcc_input, target, _) in t:
-                onehot_input = onehot_input.to(device)
+            for batch_idx, (snippet, mfcc_input) in t:
+                snippet = snippet.to(device)
                 mfcc_input = mfcc_input.to(device)
-                target = target.to(device)
 
-                output, mean, variance = model(onehot_input, mfcc_input, False, verbose)
+                output, mean, variance = model(snippet[...,:4096].unsqueeze(1), mfcc_input, False, verbose)
                 real_loss, rec_loss, kl_loss = calculate_loss(
-                    output.transpose(1, 2), target, mean, variance, kl_mult, loss_fn)
+                    output[..., -1], snippet[..., -1].type(torch.LongTensor).to(device), mean, variance, kl_mult, loss_fn)
                 total_eval_loss = [
                     total_eval_loss[0] + real_loss.item(),
                     total_eval_loss[1] + rec_loss.item(),
@@ -96,18 +95,17 @@ def train(model, dataloader_train, dataloader_val, writer, export_path, learning
         divstep = 1
 
         with tqdm(enumerate(dataloader_train), total=len(dataloader_train), desc=f"Training. Epoch: {epoch}. Loss for step {step}: n.v.t.", colour='magenta') as t:
-            for batch_idx, (onehot_input, mfcc_input, target, _) in t:
+            for batch_idx, (snippet, mfcc_input) in t:
                 model.train(True)
                 optimizer.zero_grad(set_to_none=True)
 
-                onehot_input = onehot_input.to(device)
+                snippet = snippet.to(device)
                 mfcc_input = mfcc_input.to(device)
-                target = target.to(device)
 
-                output, mean, variance = model(onehot_input, mfcc_input, True, verbose)
+                output, mean, variance = model(snippet[...,:4096].unsqueeze(1), mfcc_input, True, verbose)
 
                 real_loss, rec_loss, kl_loss = calculate_loss(
-                    output.transpose(2, 1), target, mean, variance, kl_mult, loss_fn)
+                    output[..., -1], snippet[..., -1].type(torch.LongTensor).to(device), mean, variance, kl_mult, loss_fn)
                 
                 real_loss.backward()
                 optimizer.step()

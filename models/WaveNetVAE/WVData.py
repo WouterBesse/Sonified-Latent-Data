@@ -5,7 +5,7 @@ import os
 import librosa
 import torchaudio
 import torch.nn.functional as F
-from tqdm.auto import tqdm
+from tqdm.auto import tqdm, trange
 
 AUDIO_EXTENSIONS = [
     '.wav', '.mp3', '.flac', '.sph', '.ogg', '.opus',
@@ -51,21 +51,10 @@ class WVDataset(Dataset):
                 waveform = load_wav(full_path, sample_rate)
 
                 onehot_wave, norm_audio, mulaw_audio = self.process_audio(waveform)
-
-                i = 0
-
-                if is_generating:
-                    with tqdm(total=4096*2, leave=False) as pbar:
-                        for i in range(4096*2):
-                            self.get_snippets(mulaw_audio, onehot_wave, norm_audio,i)
-                            i += self.skip_size
-                            pbar.update(1)
-                else:
-                    with tqdm(total=norm_audio.size()[-1] // skip_size - 2, leave=False) as pbar:
-                        while i < norm_audio.size()[-1] - self.length:
-                            self.get_snippets(mulaw_audio, onehot_wave, norm_audio,i)
-                            i += self.skip_size
-                            pbar.update(1)
+                
+                self.add_snippets(mulaw_audio)
+                
+                            
                             
 
     def process_audio(self, audio):
@@ -84,59 +73,94 @@ class WVDataset(Dataset):
         audio = F.one_hot(mulawq, 256)
 
         return audio, norm_audio, mulawq
-
-    def process_mfcc(self, y):
-        mfcc = self.mfcc(y)
-        # mfcc = torch.from_numpy(librosa.feature.mfcc(y=y.numpy(), sr=self.sr, hop_length= 128))
-        mfcc_delta = self.deltagen(mfcc)
-        mfcc_delta2 = self.deltagen(mfcc_delta)
-        mfcc = torch.cat((mfcc, mfcc_delta), dim=0)
-        # mfcc = torch.cat((mfcc, mfcc_delta2), dim=0)
-        
-        
-        # mfcc /= torch.max(mfcc)
-
-        return mfcc
     
-    def get_snippets(self, mulaw_audio, onehot_audio, norm_audio, i):
-        input_audio = mulaw_audio[i:i + self.length]
-        target_sample = mulaw_audio[i:i + self.length + 1]
-        mfcc = self.process_mfcc(norm_audio[i:i + self.length])
-        if self.is_generating:
-            onehot_target = onehot_audio[i:i + self.length + 1]
-            self.files.append((input_audio, mfcc, target_sample, onehot_target))
-        else:
-            self.files.append((input_audio, mfcc, target_sample))
+    def add_snippets(self, mulaw_audio):
+        """
+        Cut wave file in self.length sized pieces, skipping every
+        """   
+        sampletotal = 4096*2 if self.is_generating else mulaw_audio.size()[-1] - self.length
 
-        if torch.max(mfcc) > self.mfcc_max:
-            self.mfcc_max = torch.max(mfcc)
-        if torch.min(mfcc) < self.mfcc_min:
-            self.mfcc_min = torch.min(mfcc)
+        for i in trange(0, sampletotal, self.skip_size, leave=False):
+            input_audio = mulaw_audio[i:i + self.length + 1]
+            self.files.append(input_audio)
         return
 
-        
 
     def __len__(self):
         return len(self.files)
 
     def __getitem__(self, idx):
-        onehot= 0
-        mfcc = 0
-        target = 0
-        oht = 0
-        if self.is_generating:
-            onehot, mfcc, target, oht = self.files[idx]
-            return onehot.type(torch.LongTensor), mfcc.type(torch.FloatTensor), target.type(torch.LongTensor), oht.type(torch.FloatTensor)
+        snippet = self.files[idx]
+        return snippet.type(torch.FloatTensor)
+
+
+class ProcessWav(object):
+    def __init__(self, sample_rate=16000, win_sz=400, hop_sz=160, n_mels=80,
+            n_mfcc=13, name=None):
+        self.sample_rate = sample_rate
+        self.window_sz = win_sz
+        self.hop_sz = hop_sz
+        self.n_mels = n_mels
+        self.n_mfcc = n_mfcc
+        self.n_out = n_mfcc * 3
+
+    def __call__(self, wav):
+        import librosa
+        wav = wav.numpy()
+        # See padding_notes.txt 
+        # NOTE: This function can't be executed on GPU due to the use of
+        # librosa.feature.mfcc
+        # C, T: n_mels, n_timesteps
+        # Output: C, T
+        # This assert doesn't seem to work when we just want to process an entire wav file
+        adj = 1 if self.window_sz % 2 == 0 else 0
+        adj_l_wing_sz = (self.window_sz - 1)//2 + adj 
+
+        left_pad = adj_l_wing_sz % self.hop_sz
+        trim_left = adj_l_wing_sz // self.hop_sz
+        trim_right = (self.window_sz - 1 - ((self.window_sz - 1)//2)) // self.hop_sz
+
+        # wav = wav.numpy()
+        wav_pad = np.concatenate((np.zeros(left_pad), wav), axis=0) 
+        mfcc = librosa.feature.mfcc(y=wav_pad, sr=self.sample_rate,
+                n_fft=self.window_sz, hop_length=self.hop_sz,
+                n_mels=self.n_mels, n_mfcc=self.n_mfcc)
+
+        def mfcc_pred_output_size(in_sz, window_sz, hop_sz):
+            '''Reverse-engineered output size calculation derived by observing the
+            behavior of librosa.feature.mfcc'''
+            n_extra = 1 if window_sz % 2 == 0 else 0
+            n_pos = in_sz + n_extra
+            return n_pos // hop_sz + (1 if n_pos % hop_sz > 0 else 0)
+
+        assert mfcc.shape[1] == mfcc_pred_output_size(wav_pad.shape[0],
+            self.window_sz, self.hop_sz)
+
+        mfcc_trim = mfcc[:,trim_left:-trim_right or None]
+
+        mfcc_delta = librosa.feature.delta(mfcc_trim)
+        mfcc_delta2 = librosa.feature.delta(mfcc_trim, order=2)
+        mfcc_and_derivatives = np.concatenate((mfcc_trim, mfcc_delta, mfcc_delta2), axis=0)
+
+        return mfcc_and_derivatives
+
+class Collate():
+    def __init__(self, mfcc, train_mode = True):
+        self.train_mode = train_mode
+        self.mfcc = mfcc
+
+    def __call__(self, batch):
+        # print(len(batch))
+
+        wav = torch.stack([d for d in batch]).float()
+        mel = torch.stack([torch.from_numpy(self.mfcc(d)) for d in batch]).float()
+
+        if self.train_mode:
+            return wav, mel
         else:
-            onehot, mfcc, target = self.files[idx]
-            return onehot.type(torch.LongTensor), mfcc.type(torch.FloatTensor), target.type(torch.LongTensor), oht
-        # mfcc = (mfcc - self.mfcc_min) / (self.mfcc_max - self.mfcc_min)
-        # print('WVDATA target size:', target.type(torch.LongTensor).size())
-        
-        # return torch.unsqueeze(onehot, 0).type(torch.FloatTensor), mfcc.type(torch.FloatTensor), target.type(
-            # torch.FloatTensor)
-
-
+            paths = [b[0][2] for b in batch]
+            return wav, mel
+            
 """
 Utility Functions
 """
