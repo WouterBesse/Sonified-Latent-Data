@@ -138,7 +138,8 @@ def train(model, dataloader_train, dataloader_val, writer, export_path, learning
                                 'train_loss_kl': total_epoch_loss[2] / divstep,
                                 'val_loss_comb': eval_loss_real,
                                 'val_loss_rec': eval_loss_rec,
-                                'val_loss_kl': eval_loss_kl})
+                                'val_loss_kl': eval_loss_kl,
+                                'kl_rate': kl_mult})
 
 #                     writer.add_scalars('Validation Loss', {
 #                         'Real loss': eval_loss_real,

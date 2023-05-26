@@ -27,20 +27,11 @@ class Wavenet(nn.Module):
         #assert layers % stacks == 0
         # self.upsample = upsample_conditional_features
 
-        self.first_conv = WOP.Conv1dWrap(in_channels = 1,
+        self.first_conv = nn.Conv1d(in_channels = 1,
                                     out_channels = res_channels, 
                                     kernel_size=1,
                                     dilation=1, 
                                     bias=bias)
-        print("changed!")
-        
-        # self.emb = nn.Sequential(nn.Embedding(out_channels, res_channels, padding_idx=out_channels // 2 - 1),
-        #                          nn.Tanh())
-        
-        # self.skip_conv = WOP.Conv1dWrap(in_channels = res_channels, 
-        #                            out_channels = res_channels, 
-        #                            kernel_size = 1, 
-        #                            bias = bias)
 
         # Wavenet layers
         receptive_field = 1
@@ -80,12 +71,12 @@ class Wavenet(nn.Module):
             WOP.Conv1dWrap(in_channels=skip_channels,
                       out_channels=skip_channels,
                       kernel_size = 1,
-                      bias = bias),
+                      bias = True),
             nn.LeakyReLU(negative_slope=0.01, inplace=True),
             WOP.Conv1dWrap(in_channels = skip_channels, 
                       out_channels = out_channels, 
                       kernel_size = 1,
-                      bias = bias),
+                      bias = True),
             # nn.ReLU(inplace=True),
         )
 
@@ -129,7 +120,7 @@ class Wavenet(nn.Module):
         for layer in self.conv_layers:
             x, s = layer(x, c)
             skips += s
-        # skips *= math.sqrt(1.0 / len(self.conv_layers))
+        skips *= math.sqrt(1.0 / len(self.conv_layers))
 
         x = skips
         x = self.final_convs(x)

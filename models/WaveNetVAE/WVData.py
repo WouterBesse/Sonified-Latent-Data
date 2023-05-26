@@ -29,8 +29,9 @@ class WVDataset(Dataset):
         self.sr = sample_rate
         self.mfcc = ProcessWav()
         path_list = os.listdir(audio_path)
-        _, osr = torchaudio.load(os.path.join(audio_path, path_list[1]))
+        _, osr = torchaudio.load(os.path.join(audio_path, path_list[2]))
         self.resample = torchaudio.transforms.Resample(osr, self.sr).cuda()
+        
 
         if max_files != 0:
             path_list = path_list[0:max_files]
@@ -40,9 +41,8 @@ class WVDataset(Dataset):
         for path in tqdm(path_list, desc='Loading and preprocessing files to dataset.', colour="blue"):
             full_path = os.path.join(audio_path, path)
             if is_audio_file(full_path):
-                waveform = load_wav(full_path, sample_rate)
-                # waveform, _ = torchaudio.load(full_path)
-                # waveform = self.resample(waveform.cuda())
+                waveform, _ = torchaudio.load(full_path)
+                waveform = self.resample(waveform.cuda())
 
                 mulaw_audio, norm_audio = self.process_audio(waveform)
                 
@@ -70,7 +70,7 @@ class WVDataset(Dataset):
         """
         Cut wave file in self.length sized pieces, skipping every
         """   
-        sampletotal = 4096*2 if self.is_generating else mulaw_audio.size()[-1] - self.length
+        sampletotal = 32000 if self.is_generating else mulaw_audio.size()[-1] - self.length
 
         for i in trange(0, sampletotal, self.skip_size, leave=False):
             input_audio = mulaw_audio[i:i + self.length + 1].cpu()
@@ -116,11 +116,11 @@ class ProcessWav(object):
         trim_left = adj_l_wing_sz // self.hop_sz
         trim_right = (self.window_sz - 1 - ((self.window_sz - 1)//2)) // self.hop_sz
 
-        wav_pad = np.concatenate((np.zeros(left_pad), wav), axis=0) 
-        mfcc = librosa.feature.mfcc(y=wav_pad, sr=self.sample_rate,
-                n_fft=self.window_sz, hop_length=self.hop_sz,
-                n_mels=self.n_mels, n_mfcc=self.n_mfcc)
-        # mfcc = self.mfcc_transform(wav_pad)
+        wav_pad = torch.cat((torch.zeros(left_pad).cuda(), wav), dim=0) 
+        # mfcc = librosa.feature.mfcc(y=wav_pad, sr=self.sample_rate,
+        #         n_fft=self.window_sz, hop_length=self.hop_sz,
+        #         n_mels=self.n_mels, n_mfcc=self.n_mfcc)
+        mfcc = self.mfcc_transform(wav_pad)
 
         def mfcc_pred_output_size(in_sz, window_sz, hop_sz):
             '''Reverse-engineered output size calculation derived by observing the
@@ -134,36 +134,36 @@ class ProcessWav(object):
 
         mfcc_trim = mfcc[:,trim_left:-trim_right or None]
         
-        # mfcc_delta = compute_deltas(mfcc_trim)
-        # mfcc_delta2 = compute_deltas(mfcc_delta)
+        mfcc_delta = compute_deltas(mfcc_trim)
+        mfcc_delta2 = compute_deltas(mfcc_delta)
 
-        mfcc_delta = librosa.feature.delta(mfcc_trim)
-        mfcc_delta2 = librosa.feature.delta(mfcc_trim, order=2)
+        # mfcc_delta = librosa.feature.delta(mfcc_trim)
+        # mfcc_delta2 = librosa.feature.delta(mfcc_trim, order=2)
         # mfcc_delta_2 = librosa.feature.delta(mfcc_delta)
         # print(mfcc_delta2 - mfcc_delta_2)
         # print(mfcc_delta2 - mfcc_delta2)
-        mfcc_and_derivatives = np.concatenate((mfcc_trim, mfcc_delta, mfcc_delta2), axis=0)
+        mfcc_and_derivatives = torch.cat((mfcc_trim, mfcc_delta, mfcc_delta2), dim=0)
 
-        return torch.from_numpy(mfcc_and_derivatives)
+        return mfcc_and_derivatives
             
 """
 Utility Functions
 """
 
 
-def load_wav(filename, sampling_rate, res_type='kaiser_fast', top_db=20, trimming_duration=None):
-    raw, _ = librosa.load(filename, sr=sampling_rate, res_type=res_type)
-    # raw, osr = torchaudio.load(filename)
-    # if trimming_duration is None:
-    #     trimmed_audio, trimming_indices = librosa.effects.trim(raw, top_db=top_db)
-    #     trimming_time = trimming_indices[0] / sampling_rate
-    # else:
-    #     trimmed_audio = raw[int(trimming_duration * sampling_rate):]
-    #     trimming_time = trimming_duration
-    # trimmed_audio /= np.abs(raw).max()
-    trimmed_audio = raw.astype(np.float32)
+# def load_wav(filename, sampling_rate, res_type='kaiser_fast', top_db=20, trimming_duration=None):
+#     raw, _ = librosa.load(filename, sr=sampling_rate, res_type=res_type)
+#     # raw, osr = torchaudio.load(filename)
+#     # if trimming_duration is None:
+#     #     trimmed_audio, trimming_indices = librosa.effects.trim(raw, top_db=top_db)
+#     #     trimming_time = trimming_indices[0] / sampling_rate
+#     # else:
+#     #     trimmed_audio = raw[int(trimming_duration * sampling_rate):]
+#     #     trimming_time = trimming_duration
+#     # trimmed_audio /= np.abs(raw).max()
+#     trimmed_audio = raw.astype(np.float32)
 
-    return torch.from_numpy(trimmed_audio)
+#     return torch.from_numpy(trimmed_audio)
 
 
 def is_audio_file(

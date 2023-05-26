@@ -24,6 +24,12 @@ def xavier_init(mod):
         nn.init.xavier_uniform_(mod.weight)
     if hasattr(mod, 'bias') and mod.bias is not None:
         nn.init.constant_(mod.bias, 0)
+        
+def xavier_init2(mod):
+    if hasattr(mod, 'weight') and mod.weight is not None:
+        nn.init.xavier_normal_(mod.weight)
+    if hasattr(mod, 'bias') and mod.bias is not None:
+        nn.init.constant_(mod.bias, 0)
     
 """
 Torch Modules
@@ -123,13 +129,12 @@ class ResidualConv1dGLU(nn.Module):
 
         # conv output is split into two groups
         gate_out_channels = gate_channels // 2
-        if not final_layer:
-            # print('vlaas')
-            self.conv1_out = nn.Conv1d(in_channels=gate_out_channels, 
-                                       out_channels=residual_channels, 
-                                       kernel_size = kernel_size,
-                                       bias=False, 
-                                       padding = 'same')
+
+        self.conv1_out = nn.Conv1d(in_channels=gate_out_channels, 
+                                   out_channels=residual_channels, 
+                                   kernel_size = kernel_size,
+                                   bias=False, 
+                                   padding = 'same')
         
         self.conv1_skip = nn.Conv1d(in_channels=gate_out_channels, 
                                     out_channels=skip_out_channels, 
@@ -167,12 +172,8 @@ class ResidualConv1dGLU(nn.Module):
         s = self.conv1_skip(x)
 
         # For residual connection
-        if self.final_layer:
-            x = x
-        else:
-            x = self.conv1_out(x)
-            # x = (x + residual) * math.sqrt(0.5)
-            x += residual
+        x = self.conv1_out(x)
+        x = (x + residual) * math.sqrt(0.5)
         
         return x, s
 
