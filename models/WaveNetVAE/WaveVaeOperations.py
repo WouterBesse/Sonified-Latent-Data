@@ -19,20 +19,42 @@ def normalisedConvTranspose2d(in_channels, out_channels, kernel_size,
     else:
         return m
 
+def xavier_init(mod):
+    if hasattr(mod, 'weight') and mod.weight is not None:
+        nn.init.xavier_uniform_(mod.weight)
+    if hasattr(mod, 'bias') and mod.bias is not None:
+        nn.init.constant_(mod.bias, 0)
+    
 """
 Torch Modules
 """
 class CausalConvolution1D(nn.Module):
 
-    def __init__(self, input_channels, output_channels, kernel_size = 1, dilation = 0, bias = False) -> None:
+    def __init__(self, in_channels, out_channels, kernel_size = 1, dilation = 0, bias = False) -> None:
         super(CausalConvolution1D, self).__init__()
 
         self.padding = (kernel_size - 1) * dilation
-        self.conv = nn.Conv1d(input_channels, output_channels, kernel_size, padding = 0, dilation = dilation, bias = bias)
+        self.conv = nn.Conv1d(in_channels=in_channels, 
+                               out_channels=out_channels, 
+                               kernel_size=kernel_size, 
+                               padding = 0, 
+                               dilation = dilation, 
+                               bias = bias)
+        xavier_init(self.conv)
 
     def forward(self, x):
         x = torch.nn.functional.pad(x, (self.padding, 0))
         return self.conv(x)
+    
+class Conv1dWrap(nn.Conv1d):
+    """
+    Simple wrapper that ensures initialization
+    Source: https://github.com/hrbigelow/ae-wavenet/blob/master/wavenet.py#L167
+    """
+    def __init__(self, **kwargs):
+        super(Conv1dWrap, self).__init__(**kwargs)
+        self.apply(xavier_init)
+
 
 class Jitter(nn.Module):
     """
@@ -79,39 +101,43 @@ class Jitter(nn.Module):
 
 class ResidualConv1dGLU(nn.Module):
 
-    def __init__(self, residual_channels, gate_channels, kernel_size, skip_out_channels = None, cin_channels = -1, dropout= 1 - 0.95, dilation = 1, bias = False):
+    def __init__(self, residual_channels, gate_channels, kernel_size, skip_out_channels = None, cin_channels = -1, dropout= 1 - 0.95, dilation = 1, bias = False, final_layer = False):
         super(ResidualConv1dGLU, self).__init__()
 
-        self.dropout = nn.Dropout(p = dropout)
+        # self.dropout = nn.Dropout(p = dropout)
+        self.final_layer = final_layer
 #       dilations = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
 
-        self.dil_conv = CausalConvolution1D(residual_channels, 
-                                  gate_channels, 
-                                  kernel_size,
+        self.dil_conv = CausalConvolution1D(in_channels=residual_channels, 
+                                  out_channels=gate_channels, 
+                                  kernel_size=kernel_size,
                                   dilation = dilation,
                                   bias = bias)
 
-        self.conv1cond = nn.Conv1d(cin_channels, 
-                                   gate_channels, 
+        self.conv1cond = nn.Conv1d(in_channels=cin_channels, 
+                                   out_channels=gate_channels, 
                                    kernel_size = 1, 
                                    padding = 0, 
                                    dilation = 1, 
-                                   bias = bias)
+                                   bias = False)
 
         # conv output is split into two groups
         gate_out_channels = gate_channels // 2
-        self.conv1_out = nn.Conv1d(gate_out_channels, 
-                                   residual_channels, 
-                                   kernel_size = kernel_size,
-                                   bias=bias, 
-                                   padding = 'same')
+        if not final_layer:
+            # print('vlaas')
+            self.conv1_out = nn.Conv1d(in_channels=gate_out_channels, 
+                                       out_channels=residual_channels, 
+                                       kernel_size = kernel_size,
+                                       bias=False, 
+                                       padding = 'same')
         
-        self.conv1_skip = nn.Conv1d(gate_out_channels, 
-                                    skip_out_channels, 
+        self.conv1_skip = nn.Conv1d(in_channels=gate_out_channels, 
+                                    out_channels=skip_out_channels, 
                                     kernel_size = kernel_size, 
-                                    bias=bias, 
+                                    bias=False, 
                                     padding = 'same')
         self.splitdim = 1
+        self.apply(xavier_init)
 
     def forward(self, x, c):
         """Forward
@@ -141,8 +167,12 @@ class ResidualConv1dGLU(nn.Module):
         s = self.conv1_skip(x)
 
         # For residual connection
-        x = self.conv1_out(x)
-        x = (x + residual) * math.sqrt(0.5)
+        if self.final_layer:
+            x = x
+        else:
+            x = self.conv1_out(x)
+            # x = (x + residual) * math.sqrt(0.5)
+            x += residual
         
         return x, s
 
@@ -161,13 +191,6 @@ class Stretch2d(nn.Module):
 def _get_activation(upsample_activation):
     nonlinear = getattr(nn, upsample_activation)
     return nonlinear
-
-def xavier_init(mod):
-    if hasattr(mod, 'weight') and mod.weight is not None:
-        nn.init.xavier_uniform_(mod.weight)
-    if hasattr(mod, 'bias') and mod.bias is not None:
-        nn.init.constant_(mod.bias, 0)
-
 
 class UpsampleNetwork(nn.Module):
     def __init__(self, upsample_scales, upsample_activation="none",

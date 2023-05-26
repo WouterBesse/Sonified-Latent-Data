@@ -20,26 +20,27 @@ class Wavenet(nn.Module):
                  dropout = 1 - 0.95, 
                  upsample_conditional_features = True, 
                  upsample_scales = None,
-                 bias = False):
+                 bias = True):
         
-        super(Wavenet, self).__init__()
+        super().__init__()
 
         #assert layers % stacks == 0
-        self.upsample = upsample_conditional_features
+        # self.upsample = upsample_conditional_features
 
-        self.first_conv = nn.Conv1d(in_channels = 1,
+        self.first_conv = WOP.Conv1dWrap(in_channels = 1,
                                     out_channels = res_channels, 
                                     kernel_size=1,
                                     dilation=1, 
                                     bias=bias)
+        print("changed!")
         
-        self.emb = nn.Sequential(nn.Embedding(out_channels, res_channels, padding_idx=out_channels // 2 - 1),
-                                 nn.Tanh())
+        # self.emb = nn.Sequential(nn.Embedding(out_channels, res_channels, padding_idx=out_channels // 2 - 1),
+        #                          nn.Tanh())
         
-        self.skip_conv = nn.Conv1d(in_channels = res_channels, 
-                                   out_channels = res_channels, 
-                                   kernel_size = 1, 
-                                   bias = bias)
+        # self.skip_conv = WOP.Conv1dWrap(in_channels = res_channels, 
+        #                            out_channels = res_channels, 
+        #                            kernel_size = 1, 
+        #                            bias = bias)
 
         # Wavenet layers
         receptive_field = 1
@@ -51,6 +52,9 @@ class Wavenet(nn.Module):
             additional_scope = kernel_size - 1
             new_dilation = 1
             for layer in range(layers):
+                
+                final_layer = (stack + 1 == stacks and layer + 1 == layers)
+                
                 resdilconv = WOP.ResidualConv1dGLU(
                     residual_channels = res_channels,
                     gate_channels = gate_channels,
@@ -59,6 +63,8 @@ class Wavenet(nn.Module):
                     cin_channels = cond_channels,
                     dilation = new_dilation,
                     dropout = dropout,
+                    bias = bias,
+                    final_layer = final_layer
                 )
                 self.conv_layers.append(resdilconv)
 
@@ -71,13 +77,15 @@ class Wavenet(nn.Module):
         
         self.final_convs = nn.Sequential(
             nn.LeakyReLU(negative_slope=0.1, inplace=True),
-            nn.Conv1d(skip_channels,
-                      skip_channels,
-                      kernel_size = 1),
+            WOP.Conv1dWrap(in_channels=skip_channels,
+                      out_channels=skip_channels,
+                      kernel_size = 1,
+                      bias = bias),
             nn.LeakyReLU(negative_slope=0.01, inplace=True),
-            nn.Conv1d(in_channels = skip_channels, 
+            WOP.Conv1dWrap(in_channels = skip_channels, 
                       out_channels = out_channels, 
-                      kernel_size = 1),
+                      kernel_size = 1,
+                      bias = bias),
             # nn.ReLU(inplace=True),
         )
 
@@ -121,7 +129,7 @@ class Wavenet(nn.Module):
         for layer in self.conv_layers:
             x, s = layer(x, c)
             skips += s
-        skips *= math.sqrt(1.0 / len(self.conv_layers))
+        # skips *= math.sqrt(1.0 / len(self.conv_layers))
 
         x = skips
         x = self.final_convs(x)
