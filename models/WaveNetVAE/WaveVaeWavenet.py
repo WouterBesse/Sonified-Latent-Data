@@ -11,9 +11,9 @@ class Wavenet(nn.Module):
                  layers = 10, 
                  stacks = 2, 
                  out_channels = 256, 
-                 res_channels = 512, 
-                 skip_channels = 512, 
-                 gate_channels = 1024, 
+                 res_channels = 384, 
+                 skip_channels = 256, 
+                 gate_channels = 768, 
                  cond_channels = -1, 
                  kernel_size = 3, 
                  freq_axis_kernel_size = 3, 
@@ -54,8 +54,7 @@ class Wavenet(nn.Module):
                     cin_channels = cond_channels,
                     dilation = new_dilation,
                     dropout = dropout,
-                    bias = bias,
-                    final_layer = final_layer
+                    bias = bias
                 )
                 self.conv_layers.append(resdilconv)
 
@@ -68,12 +67,12 @@ class Wavenet(nn.Module):
         
         self.final_convs = nn.Sequential(
             nn.LeakyReLU(negative_slope=0.1, inplace=True),
-            WOP.Conv1dWrap(in_channels=skip_channels,
+            nn.Conv1d(in_channels=skip_channels,
                       out_channels=skip_channels,
                       kernel_size = 1,
                       bias = True),
             nn.LeakyReLU(negative_slope=0.01, inplace=True),
-            WOP.Conv1dWrap(in_channels = skip_channels, 
+            nn.Conv1d(in_channels = skip_channels, 
                       out_channels = out_channels, 
                       kernel_size = 1,
                       bias = True),

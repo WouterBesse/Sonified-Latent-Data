@@ -107,39 +107,37 @@ class Jitter(nn.Module):
 
 class ResidualConv1dGLU(nn.Module):
 
-    def __init__(self, residual_channels, gate_channels, kernel_size, skip_out_channels = None, cin_channels = -1, dropout= 1 - 0.95, dilation = 1, bias = False, final_layer = False):
+    def __init__(self, residual_channels, gate_channels, kernel_size, skip_out_channels = None, cin_channels = -1, dropout= 1 - 0.95, dilation = 1, bias = False):
         super(ResidualConv1dGLU, self).__init__()
 
         # self.dropout = nn.Dropout(p = dropout)
-        self.final_layer = final_layer
 #       dilations = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
 
-        self.dil_conv = CausalConvolution1D(in_channels=residual_channels, 
-                                  out_channels=gate_channels, 
-                                  kernel_size=kernel_size,
+        self.dil_conv = CausalConvolution1D(residual_channels, 
+                                  gate_channels, 
+                                  kernel_size,
                                   dilation = dilation,
                                   bias = bias)
 
-        self.conv1cond = nn.Conv1d(in_channels=cin_channels, 
-                                   out_channels=gate_channels, 
+        self.conv1cond = nn.Conv1d(cin_channels, 
+                                   gate_channels, 
                                    kernel_size = 1, 
                                    padding = 0, 
                                    dilation = 1, 
-                                   bias = False)
+                                   bias = bias)
 
         # conv output is split into two groups
         gate_out_channels = gate_channels // 2
-
-        self.conv1_out = nn.Conv1d(in_channels=gate_out_channels, 
-                                   out_channels=residual_channels, 
+        self.conv1_out = nn.Conv1d(gate_out_channels, 
+                                   residual_channels, 
                                    kernel_size = kernel_size,
-                                   bias=False, 
+                                   bias=bias, 
                                    padding = 'same')
         
-        self.conv1_skip = nn.Conv1d(in_channels=gate_out_channels, 
-                                    out_channels=skip_out_channels, 
+        self.conv1_skip = nn.Conv1d(gate_out_channels, 
+                                    skip_out_channels, 
                                     kernel_size = kernel_size, 
-                                    bias=False, 
+                                    bias=bias, 
                                     padding = 'same')
         self.splitdim = 1
         self.apply(xavier_init)
@@ -173,7 +171,8 @@ class ResidualConv1dGLU(nn.Module):
 
         # For residual connection
         x = self.conv1_out(x)
-        x = (x + residual) * math.sqrt(0.5)
+        # x = (x + residual) * math.sqrt(0.5)
+        x += residual
         
         return x, s
 
