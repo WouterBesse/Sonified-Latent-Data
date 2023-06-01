@@ -19,8 +19,7 @@ def calculate_loss(output, target, mu, logvar, kl_term, loss_fn):
     # print(output[:, -1:, :].size(), 
     reconstruction_loss = loss_fn(output, target)
     # reconstruction_loss *= math.log2(math.e)
-    kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-    kl_loss = torch.mean(kl_loss, dim = 0)
+    kl_loss = torch.mean(-0.5 * torch.sum(torch.sum(1 + logvar - mu ** 2 - logvar.exp(), dim = 2), dim = 1), dim = 0)
     
     return reconstruction_loss + kl_loss * kl_term, reconstruction_loss, kl_loss
 
@@ -36,7 +35,7 @@ def clear_screen():
 def anneal_kl(kl_term, kl_annealing, kl_max):
     kl_term += kl_annealing
 
-    return max(kl_term, kl_max)
+    return min(kl_term, kl_max)
 
 def export_model(model, path, epoch, name = None):
     isExist = os.path.exists(path)
@@ -79,14 +78,15 @@ def validate(model, dataloader, kl_mult, loss_fn, device='cuda', verbose = False
     return total_eval_loss[0] / eval_step, total_eval_loss[1] / eval_step, total_eval_loss[2] / eval_step
 
 
-def train(model, dataloader_train, dataloader_val, writer, export_path, learning_rate=0.00001, epoch_amount=100, logs_per_epoch=5, kl_anneal=0.01, max_kl=0.5, device='cuda', verbose = False):
-    torch.cuda.empty_cache()
+def train(model, dataloader_train, dataloader_val, export_path, learning_rate=0.00001, epoch_amount=100, logs_per_epoch=5, kl_anneal=0.01, max_kl=0.5, device='cuda', verbose = False):
+    print('swag')
+    
     loss_fn = torch.nn.CrossEntropyLoss()
     # loss_fn = torch.nn.MSELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     wandb.watch(model, log="all", log_freq=1)
     logstep = 0
-    kl_mult = 0.001
+    kl_mult = 0.01
     total_step = 0
     
 
@@ -103,9 +103,10 @@ def train(model, dataloader_train, dataloader_val, writer, export_path, learning
 
                 snippet = snippet.to(device)
                 mfcc_input = mfcc_input.to(device)
+                # print('snippet size:', snippet[...,:4096].unsqueeze(1).size())
 
                 output, mean, variance = model(snippet[...,:4096].unsqueeze(1), mfcc_input, True, verbose)
-
+                # print('generated size:', output[..., -1].size(), 'target size: ', snippet[..., -1].size())
                 real_loss, rec_loss, kl_loss = calculate_loss(
                     output[..., -1], snippet[..., -1].type(torch.LongTensor).to(device), mean, variance, kl_mult, loss_fn)
                 
@@ -121,8 +122,7 @@ def train(model, dataloader_train, dataloader_val, writer, export_path, learning
 
                 t.set_description(
                     f"Training. Rec/real loss for step {step}: {round(rec_loss.item(), 2)}/{round(real_loss.item(), 2)}.")
-                # writer.add_scalar('Train step loss:',
-                #                   real_loss.item(), total_step)
+
                 step += 1
                 total_step += 1
                 divstep += 1
@@ -140,18 +140,6 @@ def train(model, dataloader_train, dataloader_val, writer, export_path, learning
                                 'val_loss_rec': eval_loss_rec,
                                 'val_loss_kl': eval_loss_kl,
                                 'kl_rate': kl_mult})
-
-#                     writer.add_scalars('Validation Loss', {
-#                         'Real loss': eval_loss_real,
-#                         'Reconstruction loss': eval_loss_rec,
-#                         'KL loss': eval_loss_kl
-#                     }, logstep)
-
-#                     writer.add_scalars('Train loss', {
-#                         'Real loss': total_epoch_loss[0] / divstep,
-#                         'Reconstruction loss': total_epoch_loss[1] / divstep,
-#                         'Kl loss': total_epoch_loss[2] / divstep
-#                     }, logstep)
 
                     logstep += 1
                     total_epoch_loss = [0, 0, 0]
@@ -172,7 +160,7 @@ if __name__ == '__main__':
     parser.add_argument('-vp', '--validation_path', help='enter the path to the validation data', type=str)
     parser.add_argument('-ep' , '--epochs', help='enter the amount of epochs', type=int)
     parser.add_argument('-ex', '--export_path', help='Location to export models', type=str, default = './exports/')
-    parser.add_argument('-bs', '--batch_size', help='enter the batch size', type=int, default = 2)
+    parser.add_argument('-bs', '--batch_size', help='enter the batch size', type=int, default = 32)
     parser.add_argument('-lr', '--learning_rate', help='enter the learning rate', type=float, default = 0.00001)
     parser.add_argument('-kla', '--kl_anneal', help='enter the kl anneal', type=float, default = 0.01)
     parser.add_argument('-mkl', '--max_kl', help='enter the max kl', type=float, default = 0.5)
@@ -185,7 +173,7 @@ if __name__ == '__main__':
 
     batchsize = args.batch_size
     device = args.device
-    input_size = (60, 112)
+    input_size = (39, 112)
     upsamples = [2, 2, 2, 2, 2, 2, 2, 2]
     zsize = 32
 
@@ -196,28 +184,33 @@ if __name__ == '__main__':
     else:
         print("Export path exists")
 
-    WaveVAE = WaveNetVAE(input_size,
-                        num_hiddens = 768,
-                        upsamples = upsamples,
-                        zsize = zsize,
-                        out_channels = 256)
+    device='cuda:4'
+    input_size = (39, 112)
+    upsamples = [2, 2, 2, 2, 2, 2, 2, 2]
+    zsize = 32
 
-    WaveVAE.to(device)
+    WaveVAE = WaveNetVAE(input_size,
+                         num_hiddens = 768,
+                         upsamples = upsamples,
+                         zsize = zsize,
+                         out_channels = 256)
+
+    WaveVAE = WaveVAE.to(device)
+
+    WaveVAE = torch.nn.DataParallel(WaveVAE, device_ids=[4,5,6,7])
     export_model(WaveVAE, args.export_path, 0)
 
     VAEDataset = WVDataset(audio_path = args.train_path,
                         length = 4096,
                         skip_size = 4096 // 2,
-                        sample_rate = 24000,
-                        max_files = args.max_files,
-                        hop_length = 128)
+                        sample_rate = 16000,
+                        max_files = args.max_files)
 
     val_VAEDataset = WVDataset(audio_path = args.validation_path,
                         length = 4096,
                         skip_size = 4096 // 2,
-                        sample_rate = 24000,
-                        max_files = 200,
-                        hop_length = 128)
+                        sample_rate = 16000,
+                        max_files = 32)
 
     VAEDataloader = DataLoader(VAEDataset,
                             batch_size = batchsize,
@@ -227,10 +220,26 @@ if __name__ == '__main__':
                             batch_size = batchsize,
                             shuffle = False)
     
-    writer = SummaryWriter()
+    wandb.init(
+        # set the wandb project where this run will be logged
+        project="WavenetVAE",
 
-    train(WaveVAE, VAEDataloader, val_VAEDataloader, 
-          writer=writer, 
+        # track hyperparameters and run metadata
+        config={
+        "learning_rate": 0.000001,
+        "architecture": "WavenetVAE",
+        "dataset": "LJSpeech",
+        "epochs": 100,
+        "max_files_train": 0,
+        "max_files_eval": 32,
+        "bias": False,
+        "init": "Xavier_U",
+        "divide skips & res": False,
+        "MFCC_Norm": True
+        }
+    )
+
+    train(WaveVAE, VAEDataloader, val_VAEDataloader,
           export_path = args.export_path,
           learning_rate=args.learning_rate, 
           epoch_amount=args.epochs, 

@@ -27,7 +27,7 @@ class Wavenet(nn.Module):
         #assert layers % stacks == 0
         # self.upsample = upsample_conditional_features
 
-        self.first_conv = nn.Conv1d(in_channels = 1,
+        self.first_conv = WOP.Conv1dWrap(in_channels = 1,
                                     out_channels = res_channels, 
                                     kernel_size=1,
                                     dilation=1, 
@@ -67,12 +67,12 @@ class Wavenet(nn.Module):
         
         self.final_convs = nn.Sequential(
             nn.LeakyReLU(negative_slope=0.1, inplace=True),
-            nn.Conv1d(in_channels=skip_channels,
+            WOP.Conv1dWrap(in_channels=skip_channels,
                       out_channels=skip_channels,
                       kernel_size = 1,
                       bias = True),
             nn.LeakyReLU(negative_slope=0.01, inplace=True),
-            nn.Conv1d(in_channels = skip_channels, 
+            WOP.Conv1dWrap(in_channels = skip_channels, 
                       out_channels = out_channels, 
                       kernel_size = 1,
                       bias = True),

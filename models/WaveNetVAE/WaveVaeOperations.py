@@ -21,9 +21,19 @@ def normalisedConvTranspose2d(in_channels, out_channels, kernel_size,
 
 def xavier_init(mod):
     if hasattr(mod, 'weight') and mod.weight is not None:
-        nn.init.xavier_uniform_(mod.weight)
+        nn.init.xavier_normal_(mod.weight, gain=nn.init.calculate_gain('leaky_relu'))
     if hasattr(mod, 'bias') and mod.bias is not None:
-        nn.init.constant_(mod.bias, 0)
+        mod.bias.data.zero_()
+        
+def _init_weights(module):
+        if isinstance(module, nn.Conv1d):
+            nn.init.xavier_uniform_(module.weight, gain=nn.init.calculate_gain('leaky_relu'))
+            # nn.init.xavier_normal_(module.weight, gain=nn.init.calculate_gain('leaky_relu'))
+            # nn.init.kaiming_uniform_(module.weight, nonlinearity='leaky_relu')
+            # nn.init.kaiming_normal_(module.weight, nonlinearity='leaky_relu')
+            if hasattr(mod, 'bias') and mod.bias is not None:
+                module.bias.data.zero_()
+
         
 def xavier_init2(mod):
     if hasattr(mod, 'weight') and mod.weight is not None:
@@ -119,8 +129,8 @@ class ResidualConv1dGLU(nn.Module):
                                   dilation = dilation,
                                   bias = bias)
 
-        self.conv1cond = nn.Conv1d(cin_channels, 
-                                   gate_channels, 
+        self.conv1cond = Conv1dWrap(in_channels = cin_channels, 
+                                   out_channels = gate_channels, 
                                    kernel_size = 1, 
                                    padding = 0, 
                                    dilation = 1, 
@@ -128,19 +138,19 @@ class ResidualConv1dGLU(nn.Module):
 
         # conv output is split into two groups
         gate_out_channels = gate_channels // 2
-        self.conv1_out = nn.Conv1d(gate_out_channels, 
-                                   residual_channels, 
+        self.conv1_out = Conv1dWrap(in_channels=gate_out_channels, 
+                                   out_channels=residual_channels, 
                                    kernel_size = kernel_size,
                                    bias=bias, 
                                    padding = 'same')
         
-        self.conv1_skip = nn.Conv1d(gate_out_channels, 
-                                    skip_out_channels, 
+        self.conv1_skip = Conv1dWrap(in_channels = gate_out_channels, 
+                                    out_channels = skip_out_channels, 
                                     kernel_size = kernel_size, 
                                     bias=bias, 
                                     padding = 'same')
         self.splitdim = 1
-        self.apply(xavier_init)
+        # self.apply(xavier_init)
 
     def forward(self, x, c):
         """Forward

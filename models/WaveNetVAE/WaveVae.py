@@ -37,14 +37,14 @@ class Decoder(nn.Module):
         units to mix information across neighboring timesteps.
         (https://github.com/swasun/VQ-VAE-Speech/blob/master/src/models/wavenet_decoder.py#L50)
         """
-        self.conv_1 = nn.Conv1d(in_channels=zsize,
+        self.conv_1 = WOP.Conv1dWrap(in_channels=zsize,
                                 out_channels=128,
                                 kernel_size=2,
                                 padding='same')
 
-        if use_kaiming_normal:
-            self.conv_1 = nn.utils.weight_norm(self.conv_1)
-            nn.init.kaiming_normal_(self.conv_1.weight)
+        # if use_kaiming_normal:
+            # self.conv_1 = nn.utils.weight_norm(self.conv_1)
+            # nn.init.kaiming_normal_(self.conv_1.weight)
 
         self.wavenet = Wavenet(
             layers=10,
@@ -105,16 +105,16 @@ class Encoder(nn.Module):
                                 kernel_size=3,
                                 padding='same')
 
-        self.conv_2 = nn.Conv1d(features,
-                                hidden_dim,
+        self.conv_2 = WOP.Conv1dWrap(in_channels=features,
+                                out_channels=hidden_dim,
                                 kernel_size=3,
                                 padding='same')
 
         """
         Downsample in the time axis by a factor of 2
         """
-        self.downsample = nn.Conv1d(hidden_dim,
-                                    hidden_dim,
+        self.downsample = WOP.Conv1dWrap(in_channels=hidden_dim,
+                                    out_channels=hidden_dim,
                                     kernel_size=4,
                                     stride=2,
                                     padding=1)
@@ -125,8 +125,8 @@ class Encoder(nn.Module):
         self.resblocks = nn.ModuleList()
         for _ in range(resblocks):
             self.resblocks.append(
-                nn.Conv1d(hidden_dim,
-                          hidden_dim,
+                WOP.Conv1dWrap(in_channels=hidden_dim,
+                          out_channels=hidden_dim,
                           kernel_size=3,
                           padding='same'))
 
@@ -137,13 +137,13 @@ class Encoder(nn.Module):
         for _ in range(relublocks):
             self.relublocks.append(
                 nn.Sequential(
-                    nn.Conv1d(hidden_dim,
-                              hidden_dim,
+                    WOP.Conv1dWrap(in_channels=hidden_dim,
+                              out_channels=hidden_dim,
                               kernel_size=3,
                               padding='same'),
                     nn.LeakyReLU(negative_slope=0.1, inplace=True),
-                    nn.Conv1d(hidden_dim,
-                              hidden_dim,
+                    WOP.Conv1dWrap(in_channels=hidden_dim,
+                              out_channels=hidden_dim,
                               kernel_size=3,
                               padding='same'),
                     nn.LeakyReLU(negative_slope=0.1, inplace=True)))
@@ -152,8 +152,8 @@ class Encoder(nn.Module):
         The linear block from the WaveNet VQVAE paper.
         This is deceptively not an actual linear layer, but just a convolution layer.
         """
-        self.linear = nn.Conv1d(hidden_dim,
-                                zsize * 2,
+        self.linear = nn.Conv1d(in_channels=hidden_dim,
+                                out_channels=zsize * 2,
                                 kernel_size=1,
                                 bias=False,
                                 padding='same')
