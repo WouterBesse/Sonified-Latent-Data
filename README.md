@@ -16,7 +16,7 @@ A lot of earlier experiments relevant to this project I tried using the WaveNet 
 ## Models
 
 ### Standard WaveNet VAE
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1WM5do9HKMslXeQzKuPiklYVT-IwOogzL?usp=sharing]
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1WM5do9HKMslXeQzKuPiklYVT-IwOogzL?usp=sharing)]
 
 <img src="https://github.com/WouterBesse/Sonified-Latent-Data/blob/main/media/WaveNetVae.jpg?raw=true" align="right" width="430px" alt="WaveNet VAE Diagram" />
 
