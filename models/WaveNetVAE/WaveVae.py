@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torchaudio.transforms import MuLawEncoding, MuLawDecoding
 import models.WaveNetVAE.WaveVaeOperations as WOP
-from models.WaveNetVAE.WaveVaeWavenet import Wavenet
+from models.WaveNetVAE.Wavenet import Wavenet
 from tqdm.auto import tqdm
 import torch.distributions as dist
 
