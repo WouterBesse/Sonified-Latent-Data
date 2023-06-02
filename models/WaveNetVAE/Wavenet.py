@@ -6,7 +6,7 @@ import models.WaveNetVAE.WaveVaeOperations as WOP
 # import WaveVaeOperations as WOP
 
 class Wavenet(nn.Module):
-
+    """WaveNet class"""
     def __init__(self, 
                  layers = 10, 
                  stacks = 2, 
@@ -25,9 +25,7 @@ class Wavenet(nn.Module):
         
         super().__init__()
 
-        #assert layers % stacks == 0
-        # self.upsample = upsample_conditional_features
-
+        # Upsample audio to size of residual channels
         self.first_conv = WOP.Conv1dWrap(in_channels = 1,
                                     out_channels = res_channels, 
                                     kernel_size=1,
@@ -35,7 +33,7 @@ class Wavenet(nn.Module):
                                     bias=bias,
                                     init_type=init_type)
 
-        # Wavenet layers
+        # Make WaveNet layers
         receptive_field = 1
         self.dilations = []
         self.dilated_queues = []
@@ -95,31 +93,25 @@ class Wavenet(nn.Module):
     def forward(self, x, c = None, verbose = False):
         """Forward step
         Args:
-            x (Tensor): One-hot encoded audio signal, shape (B x C x T)
-            c (Tensor): Local conditioning features,
-              shape (B x cin_channels x T)
+            x (Tensor): Mulaw encoded audio signal, shape (B x 1 x T)
+            c (Tensor): Local conditioning features, shape (B x cin_channels x timesteps)
               Also type of input tensor must be FloatTensor, not LongTensor
-            softmax (bool): Whether applies softmax or not.
         Returns:
             Tensor: output, shape B x out_channels x T
         """
 
-        # B x 1 x C x T
+        # Upsample local conditioning features
         if verbose:
-            print("Condition before upsampling: ", c.size())
-            
+            print("Condition before upsampling: ", c.size())   
         c = self.lc_upsample(c)
-        # B x C x T
-
         if verbose:
             print("Condition and x after c upsampling: ", c.size(), x.size())
         
-        assert c.size(-1) == x.size(-1)
+        assert c.size(-1) == x.size(-1) # Make sure audio and local conditioning have same timesteps
         
         # Feed data to network
         x = self.first_conv(x)
-        # x = self.emb(x).transpose(1, 2)
-        # skip = self.skip_conv(x)
+
         skips = 0
         for layer in self.conv_layers:
             x, s = layer(x, c)
