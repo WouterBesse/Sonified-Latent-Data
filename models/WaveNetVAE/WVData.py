@@ -18,7 +18,7 @@ class WVDataset(Dataset):
     """
     Custom dataset that slices audio up and mulaw quantises it
     """
-    def __init__(self, audio_path, length, skip_size, sample_rate, max_files=0, is_generating = False, device = 'cuda'):
+    def __init__(self, audio_path, length, skip_size, sample_rate, max_files=0, is_generating = False, train = False, device = 'cuda'):
         super(WVDataset, self).__init__()
 
         self.length = length
@@ -32,7 +32,7 @@ class WVDataset(Dataset):
         # path_list = os.listdir(audio_path)
         # root, subdirs, path_list = os.walk(audio_path)
         # _, osr = torchaudio.load(os.path.join(audio_path, path_list[2]))
-        self.resample = torchaudio.transforms.Resample(16000, self.sr).to(device)
+        self.resample = torchaudio.transforms.Resample(22050, self.sr).to(device)
         self.mfcc_max = 0
         self.mfcc_min = 99999999
         
@@ -46,13 +46,24 @@ class WVDataset(Dataset):
         for full_path in tqdm(walkdir(audio_path), total=fileamount, desc='Loading and preprocessing files to dataset.', colour="blue"):
             # full_path = os.path.join(audio_path, path)
             if is_audio_file(full_path) and filecount < max_files:
+              if train and filecount < 32:   
                 waveform, _ = torchaudio.load(full_path)
-                # waveform = self.resample(waveform.cuda())
+                waveform = self.resample(waveform.to(device))
 
-                mulaw_audio, norm_audio = self.process_audio(waveform.to(self.device))
+                mulaw_audio, norm_audio = self.process_audio(waveform)
                 
                 self.add_snippets(mulaw_audio, norm_audio)
-            filecount += 1
+              
+              elif not train and filecount > 32:
+                waveform, _ = torchaudio.load(full_path)
+                waveform = self.resample(waveform.to(device))
+
+                mulaw_audio, norm_audio = self.process_audio(waveform)
+                
+                self.add_snippets(mulaw_audio, norm_audio)
+
+              filecount += 1
+              
                                             
 
     def process_audio(self, audio):
