@@ -1,26 +1,16 @@
-import math
 import torch
-from torch import nn, from_numpy
-from torch.utils.data import Dataset
-from torchaudio.transforms import MuLawEncoding, MFCC, Resample, MuLawDecoding
-import torchaudio
+from torch import nn
+from torchaudio.transforms import MuLawEncoding, MuLawDecoding
 import models.WaveNetVAE.WaveVaeOperations as WOP
 from models.WaveNetVAE.WaveVaeWavenet import Wavenet
-# import WaveVaeOperations as WOP
-# from WaveVaeWavenet import Wavenet
 from tqdm.auto import tqdm
-import random
-import numpy as np
 import torch.distributions as dist
-import soundfile as sf
-import os
 
 
 class Decoder(nn.Module):
     """
-    VAE Decoder
+    WaveNetVAE Decoder
     """
-
     def __init__(self, out_channels, upsamples, zsize=128, use_jitter=True,
                  jitter_probability=0.12, init_type='kaiming_n'):
         super().__init__()
@@ -29,23 +19,17 @@ class Decoder(nn.Module):
         if use_jitter:
             self.jitter = WOP.Jitter(jitter_probability)
 
-        # self.linear = nn.Linear(int(zsize), int(input_size[1] // hidden_dim))
-
         """
         The jittered latent sequence is passed through a single
         convolutional layer with filter length 3 and 128 hidden
         units to mix information across neighboring timesteps.
         (https://github.com/swasun/VQ-VAE-Speech/blob/master/src/models/wavenet_decoder.py#L50)
         """
-        self.conv_1 = WOP.Conv1dWrap(in_channels=zsize,
+        self.mix_conv = WOP.Conv1dWrap(in_channels=zsize,
                                 out_channels=128,
-                                kernel_size=2,
+                                kernel_size=3,
                                 padding='same',
                                 init_type = init_type)
-
-        # if use_kaiming_normal:
-            # self.conv_1 = nn.utils.weight_norm(self.conv_1)
-            # nn.init.kaiming_normal_(self.conv_1.weight)
 
         self.wavenet = Wavenet(
             layers=10,
@@ -67,12 +51,10 @@ class Decoder(nn.Module):
         """Forward step
         Args:
             x (Tensor): Mono audio signal, shape (B x 1 x T)
-            c (Tensor): Local conditioning features,
-              shape (B x cin_channels x T)
-            xsize (Tuple): Size of condition before flattening
+            c (Tensor): Local conditioning features, shape (B x cin_channels x T_mfcc)
             jitter (Bool): Argument deciding if we should jitter our condition or not
         Returns:
-            X (Tensor): Reconstructed result, shape (B x 1 x T)
+            X (Tensor): Reconstructed result, shape (B x 256 x T)
         """
         condition = cond
         if self.use_jitter and jitter:
@@ -80,7 +62,7 @@ class Decoder(nn.Module):
         if verbose:
             print("X size before wavenet: ", x.size())
 
-        condition = self.conv_1(condition)
+        condition = self.mix_conv(condition)
 
         x = self.wavenet(x, condition, verbose)
 
@@ -89,7 +71,7 @@ class Decoder(nn.Module):
 
 class Encoder(nn.Module):
     """
-    VAE Encoder
+    WaveNETVAE Encoder
     """
 
     def __init__(self, input_size, hidden_dim=768, zsize=128, resblocks=2, relublocks=4, init_type = 'kaiming_n'):
@@ -172,9 +154,8 @@ class Encoder(nn.Module):
         Args:
             x (Tensor): MFCC, shape (B x features x timesteps)
         Returns:
-            zcomb[:, :self.zsize] (Tensor): Latent space mean, shape (B x zsize)
-            zcomb[:, self.zsize:] (Tensor): Latent space variance, shape (B x zsize)
-            x_size (Tuple): Size of condition before flattening, shape (B x hidden_dim x timesteps)
+            mu (Tensor): Latent space mean, shape (B x zsize x timesteps//2)
+            log_var (Tensor): Latent space variance, shape (B x zsize x timesteps//2)
         """
 
         net = self.conv_1(x)
@@ -207,12 +188,14 @@ class Encoder(nn.Module):
 
 
 class WaveNetVAE(nn.Module):
+    """
+    Full WaveNetVAE model
+    """
 
     def __init__(self, input_size, num_hiddens, upsamples, zsize=32, resblocks=2, out_channels=256, init_type='kaiming_n'):
         super(WaveNetVAE, self).__init__()
         
         self.out_channels = out_channels
-        self.softmax = nn.Softmax(dim=1)
 
         self.encoder = Encoder(
             input_size=input_size,
@@ -233,41 +216,37 @@ class WaveNetVAE(nn.Module):
         self.mulaw = MuLawEncoding()
         self.mudec = MuLawDecoding()
         self.N = torch.distributions.Normal(0, 1)
-        # self.N.loc = self.N.loc.cuda() # hack to get sampling on the GPU
-        # self.N.scale = self.N.scale.cuda()
 
     def sample(self, mu, logvar):
-        std = logvar.mul(0.5).exp()
-        # return torch.normal(mu, std)
-        # eps = torch.randn(*mu.size()).to(mu.get_device())
-        eps = self.N.sample(mu.shape).to(mu.get_device())
-        z = mu + std * eps
-        return z
-
-    def samplenew(self, mu, logvar):
+        """Sample from latent space
+        Args:
+            mu (Tensor): Mean of latent space, shape (B x zsize x timesteps//2)
+            logvar (Tensor): Variance of latent space, shape (B x zsize x timesteps//2)
+        Returns:
+            z (Tensor): Sampled latent space, shape (B x zsize x timesteps//2)
+        """
         if self.training:
             z = torch.randn_like(mu).mul(torch.exp(0.5 * logvar)).add_(mu)
         else:
             z = mu
-
         return z
 
     def forward(self, xau, xspec, jitter, verbose = False):
         """Forward step
         Args:
             xau (Tensor): Audio, shape (B x 1 x T)
-            xspec (Tensor): MFCC, shape (B x features x timestpes)
+            xspec (Tensor): MFCC, shape (B x features x timesteps)
             jitter (Bool): To jitter the latent space condition or not
         Returns:
             x_hat (Tensor): Reconstructed Audio, shape (B x 1 x T)
-            mean (Tensor): Mean of latent space, shape (B x zsize)
-            var (Tensor): Variance of latent space, shape (B x zsize)
+            mean (Tensor): Mean of latent space, shape (B x zsize x timesteps//2)
+            var (Tensor): Variance of latent space, shape (B x zsize x timesteps//2)
         """
         mean, log_var = self.encoder(xspec, verbose)
 
         z = None
         if self.training:
-            z = self.samplenew(mean, log_var)
+            z = self.sample(mean, log_var)
         else:
             z = mean
 
@@ -275,84 +254,46 @@ class WaveNetVAE(nn.Module):
 
         return x_hat, mean, log_var
     
-#     def sample_value(self, x, device, quantization_channels=256):
-#         # print(x[:, :, -1].size())
-#         pdf = self.softmax(x[:, :, -1]).to(device)
-        
-#         cdf = torch.cumsum(pdf, dim=1).to(device)
-#         batch_size = cdf.size()[0]
-#         sample_prob = torch.rand(batch_size).to(device)
-#         pred = torch.zeros(batch_size, dtype=torch.float32).to(device)
-        
-#         for i, prob in enumerate(sample_prob):
-#             # pred[i] = cdf[i].searchsorted(prob)
-#             pred[i] = torch.searchsorted(cdf[i], prob)
-#         # print(probs.size())
-#         # max_prob = torch.argmax(probs,dim=1).to(device)
-        
-#         # max_prob = max_prob + ((1**0.5)*torch.randn(1)).type(torch.LongTensor).to(device)
-#         # print(max_prob.size())
-#         return pred
-    
     def sample_value(self, x, temperature = 1.0, device = 'cuda'):
+        """
+        Sample from softmax distribution or convert to sample value
+        """
         x = x[..., -1]
         if temperature > 0:
             # sample from softmax distribution
             x /= temperature
             x = x.squeeze()
             prob = torch.nn.functional.softmax(x, dim=0)
-            
-            # prob = prob.squeeze()
-            # print("prob size ",prob.size())
-            # np_prob = prob.data.numpy()
-            # print("np_prob size ", np_prob.size())
-            # x = np.random.choice(self.out_channels, p=np_prob)
+
             cd = dist.Categorical(prob)
             x = cd.sample()
-            # x = torch.argmax(prob)
-            # x = np.array([x])
         else:
             # convert to sample value
-            x = torch.max(x, 0)[1][0]
-            x = x.cpu()
-            x = x.data.numpy()
+            x = torch.argmax(x, 0)
         return x.to(device)
     
     def inference(self, dataloader, size = 4096, device='cuda'):
 
         audio_gen = torch.zeros(1, 1, size).to(device[0])
         print(audio_gen.size())
-        audio2 = []
         first_loop = True
         for batch_idx, (waveform, mfcc_input) in enumerate(tqdm(dataloader)):
-            
+            # Loop through all snippets, generate new sample and append to audio_gen
+            # First snippet is generated from original audio
             if first_loop:
                 audio_gen = waveform.to(device[0])[...,:4096]
-                snippet_gen, _, _ = self.forward(waveform[...,:4096].unsqueeze(1).to(device[0]), mfcc_input.to(device[0]), False)
+                snippet_gen, _, _ = self.forward(audio_gen[...,-4096:].to(device[0]).unsqueeze(1), mfcc_input.to(device[0]), False)
                 if self.out_channels == 256:
                     snippet_gen = self.sample_value(snippet_gen, 1.0, device[0])
-
-                # print(audio_gen.size(), snippet_gen.unsqueeze(0).size())
                 
                 audio_gen = torch.cat((audio_gen, snippet_gen.unsqueeze(0).unsqueeze(0)), 1)
-                # audio_gen = snippet_gen
                 first_loop = False
             else:
-                # print("Gen: ", audio_gen[:, -4096:][:, -5:-1].detach().cpu())
-                # print("One: ", onehot_input[:, -5:-1].detach().cpu())
-                # print("Gen: ", audio_gen[:, -4096:].detach().cpu().size())
-                # print("One: ", onehot_input.detach().cpu().size())
-                # print("========")
-                # print(audio_gen[:, -4096:].size())
-                snippet_gen, _, _ = self.forward(audio_gen.to(device[0])[..., -4096:].unsqueeze(1), mfcc_input.to(device[0]), False)
-                # snippet_gen, _, _ = self.forward(audio_gen[:, -4096:], mfcc_input.to(device), False)
+                snippet_gen, _, _ = self.forward(audio_gen[..., -4096:].to(device[0]).unsqueeze(1), mfcc_input.to(device[0]), False)
                 if self.out_channels == 256:
                     snippet_gen = self.sample_value(snippet_gen, 1.0, device[0])
-                # print(snippet_gen.item())
-                audio_gen = torch.cat((audio_gen, snippet_gen.unsqueeze(0).unsqueeze(0)), 1)
 
-#         if self.out_channels == 256:
-#             audio_gen = self.mudec(audio_gen)
+                audio_gen = torch.cat((audio_gen, snippet_gen.unsqueeze(0).unsqueeze(0)), 1)
             
         return audio_gen
 
