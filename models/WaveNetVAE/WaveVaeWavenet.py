@@ -20,7 +20,8 @@ class Wavenet(nn.Module):
                  dropout = 1 - 0.95, 
                  upsample_conditional_features = True, 
                  upsample_scales = None,
-                 bias = True):
+                 bias = True,
+                 init_type = 'kaiming_u'):
         
         super().__init__()
 
@@ -31,7 +32,8 @@ class Wavenet(nn.Module):
                                     out_channels = res_channels, 
                                     kernel_size=1,
                                     dilation=1, 
-                                    bias=bias)
+                                    bias=bias,
+                                    init_type=init_type)
 
         # Wavenet layers
         receptive_field = 1
@@ -54,7 +56,8 @@ class Wavenet(nn.Module):
                     cin_channels = cond_channels,
                     dilation = new_dilation,
                     dropout = dropout,
-                    bias = bias
+                    bias = bias,
+                    init_type = init_type
                 )
                 self.conv_layers.append(resdilconv)
 
@@ -70,13 +73,15 @@ class Wavenet(nn.Module):
             WOP.Conv1dWrap(in_channels=skip_channels,
                       out_channels=skip_channels,
                       kernel_size = 1,
-                      bias = True),
+                      bias = True,
+                      init_type=init_type),
             nn.LeakyReLU(negative_slope=0.01, inplace=True),
             WOP.Conv1dWrap(in_channels = skip_channels, 
                       out_channels = out_channels, 
                       kernel_size = 1,
-                      bias = True),
-            # nn.ReLU(inplace=True),
+                      bias = True,
+                      init_type=init_type),
+            nn.LeakyReLU(negative_slope=0.01, inplace=True)
         )
 
         # Convolutions for upsampling latent space condition

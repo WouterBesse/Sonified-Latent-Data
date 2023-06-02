@@ -22,7 +22,7 @@ class Decoder(nn.Module):
     """
 
     def __init__(self, out_channels, upsamples, zsize=128, use_jitter=True,
-                 jitter_probability=0.12, use_kaiming_normal=True):
+                 jitter_probability=0.12, init_type='kaiming_n'):
         super().__init__()
 
         self.use_jitter = use_jitter
@@ -40,7 +40,8 @@ class Decoder(nn.Module):
         self.conv_1 = WOP.Conv1dWrap(in_channels=zsize,
                                 out_channels=128,
                                 kernel_size=2,
-                                padding='same')
+                                padding='same',
+                                init_type = init_type)
 
         # if use_kaiming_normal:
             # self.conv_1 = nn.utils.weight_norm(self.conv_1)
@@ -57,6 +58,7 @@ class Decoder(nn.Module):
             kernel_size=3,
             upsample_conditional_features=True,
             upsample_scales=upsamples,
+            init_type = init_type
         )
 
         self.receptive_field = self.wavenet.receptive_field
@@ -90,7 +92,7 @@ class Encoder(nn.Module):
     VAE Encoder
     """
 
-    def __init__(self, input_size, hidden_dim=768, zsize=128, resblocks=2, relublocks=4):
+    def __init__(self, input_size, hidden_dim=768, zsize=128, resblocks=2, relublocks=4, init_type = 'kaiming_n'):
         super().__init__()
 
         features, timesteps = input_size
@@ -103,12 +105,14 @@ class Encoder(nn.Module):
         self.conv_1 = WOP.Conv1dWrap(in_channels=features,
                                 out_channels=hidden_dim,
                                 kernel_size=3,
-                                padding='same')
+                                padding='same',
+                                init_type = init_type)
 
         self.conv_2 = WOP.Conv1dWrap(in_channels=features,
                                 out_channels=hidden_dim,
                                 kernel_size=3,
-                                padding='same')
+                                padding='same',
+                                init_type = init_type)
 
         """
         Downsample in the time axis by a factor of 2
@@ -117,7 +121,8 @@ class Encoder(nn.Module):
                                     out_channels=hidden_dim,
                                     kernel_size=4,
                                     stride=2,
-                                    padding=1)
+                                    padding=1,
+                                    init_type = init_type)
 
         """
         Residual convs
@@ -128,7 +133,8 @@ class Encoder(nn.Module):
                 WOP.Conv1dWrap(in_channels=hidden_dim,
                           out_channels=hidden_dim,
                           kernel_size=3,
-                          padding='same'))
+                          padding='same'),
+                          init_type = init_type)
 
         """
         Relu blocks
@@ -140,12 +146,14 @@ class Encoder(nn.Module):
                     WOP.Conv1dWrap(in_channels=hidden_dim,
                               out_channels=hidden_dim,
                               kernel_size=3,
-                              padding='same'),
+                              padding='same',
+                              init_type = init_type),
                     nn.LeakyReLU(negative_slope=0.1, inplace=True),
                     WOP.Conv1dWrap(in_channels=hidden_dim,
                               out_channels=hidden_dim,
                               kernel_size=3,
-                              padding='same'),
+                              padding='same',
+                              init_type = init_type),
                     nn.LeakyReLU(negative_slope=0.1, inplace=True)))
 
         """
@@ -156,7 +164,8 @@ class Encoder(nn.Module):
                                 out_channels=zsize * 2,
                                 kernel_size=1,
                                 bias=False,
-                                padding='same')
+                                padding='same',
+                                init_type = init_type)
 
     def forward(self, x, verbose):
         """Forward step
@@ -199,7 +208,7 @@ class Encoder(nn.Module):
 
 class WaveNetVAE(nn.Module):
 
-    def __init__(self, input_size, num_hiddens, upsamples, zsize=32, resblocks=2, out_channels=256):
+    def __init__(self, input_size, num_hiddens, upsamples, zsize=32, resblocks=2, out_channels=256, init_type='kaiming_n'):
         super(WaveNetVAE, self).__init__()
         
         self.out_channels = out_channels
@@ -210,12 +219,14 @@ class WaveNetVAE(nn.Module):
             hidden_dim=num_hiddens,
             zsize=zsize,
             resblocks=resblocks,
+            init_type = init_type
         )
 
         self.decoder = Decoder(
             out_channels=out_channels,
             upsamples=upsamples,
-            zsize=zsize
+            zsize=zsize,
+            init_type = init_type
         )
 
         self.receptive_field = self.decoder.receptive_field

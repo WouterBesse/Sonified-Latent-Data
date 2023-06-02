@@ -19,44 +19,47 @@ def normalisedConvTranspose2d(in_channels, out_channels, kernel_size,
     else:
         return m
 
-def xavier_init(mod):
+def xavieru_init(mod):
+    if hasattr(mod, 'weight') and mod.weight is not None:
+        nn.init.xavier_uniform_(mod.weight, gain=nn.init.calculate_gain('leaky_relu'))
+    if hasattr(mod, 'bias') and mod.bias is not None:
+        mod.bias.data.zero_()
+
+def xaviern_init(mod):
     if hasattr(mod, 'weight') and mod.weight is not None:
         nn.init.xavier_normal_(mod.weight, gain=nn.init.calculate_gain('leaky_relu'))
     if hasattr(mod, 'bias') and mod.bias is not None:
         mod.bias.data.zero_()
-        
-def _init_weights(module):
-        if isinstance(module, nn.Conv1d):
-            nn.init.xavier_uniform_(module.weight, gain=nn.init.calculate_gain('leaky_relu'))
-            # nn.init.xavier_normal_(module.weight, gain=nn.init.calculate_gain('leaky_relu'))
-            # nn.init.kaiming_uniform_(module.weight, nonlinearity='leaky_relu')
-            # nn.init.kaiming_normal_(module.weight, nonlinearity='leaky_relu')
-            if hasattr(mod, 'bias') and mod.bias is not None:
-                module.bias.data.zero_()
 
-        
-def xavier_init2(mod):
+def kaimingu_init(mod):
     if hasattr(mod, 'weight') and mod.weight is not None:
-        nn.init.xavier_normal_(mod.weight)
+        nn.init.kaiming_normal_(mod.weight, a=0.1, nonlinearity='leaky_relu')
     if hasattr(mod, 'bias') and mod.bias is not None:
-        nn.init.constant_(mod.bias, 0)
+        mod.bias.data.zero_()
+
+def kaimingn_init(mod):
+    if hasattr(mod, 'weight') and mod.weight is not None:
+        nn.init.kaiming_normal_(mod.weight, a=0.1, nonlinearity='leaky_relu')
+    if hasattr(mod, 'bias') and mod.bias is not None:
+        mod.bias.data.zero_()
+
     
 """
 Torch Modules
 """
 class CausalConvolution1D(nn.Module):
 
-    def __init__(self, in_channels, out_channels, kernel_size = 1, dilation = 0, bias = False) -> None:
+    def __init__(self, in_channels, out_channels, kernel_size = 1, dilation = 0, bias = False, init_type = 'kaiming_n') -> None:
         super(CausalConvolution1D, self).__init__()
 
         self.padding = (kernel_size - 1) * dilation
-        self.conv = nn.Conv1d(in_channels=in_channels, 
+        self.conv = Conv1dWrap(in_channels=in_channels, 
                                out_channels=out_channels, 
                                kernel_size=kernel_size, 
                                padding = 0, 
                                dilation = dilation, 
-                               bias = bias)
-        xavier_init(self.conv)
+                               bias = bias,
+                               init_type = init_type)
 
     def forward(self, x):
         x = torch.nn.functional.pad(x, (self.padding, 0))
@@ -69,7 +72,15 @@ class Conv1dWrap(nn.Conv1d):
     """
     def __init__(self, **kwargs):
         super(Conv1dWrap, self).__init__(**kwargs)
-        self.apply(xavier_init)
+        init_type = kwargs.init_type
+        if init_type == 'xavier_u':
+            self.apply(xavieru_init)
+        elif init_type == 'xavier_n':
+            self.apply(xaviern_init)
+        elif init_type == 'kaiming_u':
+            self.apply(kaimingu_init)
+        elif init_type == 'kaiming_n':
+            self.apply(kaimingn_init)
 
 
 class Jitter(nn.Module):
@@ -117,7 +128,7 @@ class Jitter(nn.Module):
 
 class ResidualConv1dGLU(nn.Module):
 
-    def __init__(self, residual_channels, gate_channels, kernel_size, skip_out_channels = None, cin_channels = -1, dropout= 1 - 0.95, dilation = 1, bias = False):
+    def __init__(self, residual_channels, gate_channels, kernel_size, skip_out_channels = None, cin_channels = -1, dropout= 1 - 0.95, dilation = 1, bias = False, init_type='kaiming_n'	):
         super(ResidualConv1dGLU, self).__init__()
 
         # self.dropout = nn.Dropout(p = dropout)
@@ -127,14 +138,16 @@ class ResidualConv1dGLU(nn.Module):
                                   gate_channels, 
                                   kernel_size,
                                   dilation = dilation,
-                                  bias = bias)
+                                  bias = bias,
+                                  init_type = init_type)
 
         self.conv1cond = Conv1dWrap(in_channels = cin_channels, 
                                    out_channels = gate_channels, 
                                    kernel_size = 1, 
                                    padding = 0, 
                                    dilation = 1, 
-                                   bias = bias)
+                                   bias = bias,
+                                   init_type = init_type)
 
         # conv output is split into two groups
         gate_out_channels = gate_channels // 2
@@ -142,13 +155,15 @@ class ResidualConv1dGLU(nn.Module):
                                    out_channels=residual_channels, 
                                    kernel_size = kernel_size,
                                    bias=bias, 
-                                   padding = 'same')
+                                   padding = 'same',
+                                   init_type = init_type)
         
         self.conv1_skip = Conv1dWrap(in_channels = gate_out_channels, 
                                     out_channels = skip_out_channels, 
                                     kernel_size = kernel_size, 
                                     bias=bias, 
-                                    padding = 'same')
+                                    padding = 'same',
+                                    init_type = init_type)
         self.splitdim = 1
         # self.apply(xavier_init)
 
@@ -242,7 +257,7 @@ class UpsampleNetwork(nn.Module):
         return c
     
 class Upsampling(nn.Module):
-    def __init__(self, n_chan, filter_sz, stride, bias=True, name=None):
+    def __init__(self, n_chan, filter_sz, stride, bias=True, name=None, init_type='kaiming_n'):
         super(Upsampling, self).__init__()
         # See upsampling_notes.txt: padding = filter_sz - stride
         # and: left_offset = left_wing_sz - end_padding
@@ -250,7 +265,15 @@ class Upsampling(nn.Module):
 
         self.tconv = nn.ConvTranspose1d(n_chan, n_chan, filter_sz, stride,
                 padding=filter_sz - stride, bias=bias)
-        self.apply(xavier_init)
+        
+        if init_type == 'xavier_u':
+            self.apply(xavieru_init)
+        elif init_type == 'xavier_n':
+            self.apply(xaviern_init)
+        elif init_type == 'kaiming_u':
+            self.apply(kaimingu_init)
+        elif init_type == 'kaiming_n':
+            self.apply(kaimingn_init)
 
     def forward(self, lc):
         """
