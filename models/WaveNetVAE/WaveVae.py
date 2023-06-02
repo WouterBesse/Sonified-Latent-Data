@@ -146,8 +146,7 @@ class Encoder(nn.Module):
                                 out_channels=zsize * 2,
                                 kernel_size=1,
                                 bias=False,
-                                padding='same',
-                                init_type = init_type)
+                                padding='same')
 
     def forward(self, x, verbose):
         """Forward step
