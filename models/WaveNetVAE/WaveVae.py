@@ -115,8 +115,9 @@ class Encoder(nn.Module):
                 WOP.Conv1dWrap(in_channels=hidden_dim,
                           out_channels=hidden_dim,
                           kernel_size=3,
-                          padding='same'),
+                          padding='same',
                           init_type = init_type)
+                          )
 
         """
         Relu blocks

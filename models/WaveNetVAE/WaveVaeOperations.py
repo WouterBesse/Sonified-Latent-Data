@@ -59,9 +59,9 @@ class Conv1dWrap(nn.Conv1d):
     Simple wrapper that ensures initialization
     Source: https://github.com/hrbigelow/ae-wavenet/blob/master/wavenet.py#L167
     """
-    def __init__(self, **kwargs):
+    def __init__(self, init_type = 'xavier_u', **kwargs):
         super(Conv1dWrap, self).__init__(**kwargs)
-        init_type = kwargs.init_type
+        init_type = init_type
         if init_type == 'xavier_u':
             self.apply(xavieru_init)
         elif init_type == 'xavier_n':
