@@ -10,25 +10,25 @@ Weight initialisation functions
 """
 def xavieru_init(mod):
     if hasattr(mod, 'weight') and mod.weight is not None:
-        nn.init.xavier_uniform_(mod.weight, gain=nn.init.calculate_gain('leaky_relu'))
+        nn.init.xavier_uniform_(mod.weight, gain=nn.init.calculate_gain(mod.activation) if hasattr(mod, 'activation') else 1.0)
     if hasattr(mod, 'bias') and mod.bias is not None:
         mod.bias.data.zero_()
 
 def xaviern_init(mod):
     if hasattr(mod, 'weight') and mod.weight is not None:
-        nn.init.xavier_normal_(mod.weight, gain=nn.init.calculate_gain('leaky_relu'))
+        nn.init.xavier_normal_(mod.weight, gain=nn.init.calculate_gain(mod.activation) if hasattr(mod, 'activation') else 1.0)
     if hasattr(mod, 'bias') and mod.bias is not None:
         mod.bias.data.zero_()
 
 def kaimingu_init(mod):
     if hasattr(mod, 'weight') and mod.weight is not None:
-        nn.init.kaiming_normal_(mod.weight, a=0.1, nonlinearity='leaky_relu')
+        nn.init.kaiming_normal_(mod.weight, a=0.1, nonlinearity=mod.activation if hasattr(mod, 'activation') else 'leaky_relu')
     if hasattr(mod, 'bias') and mod.bias is not None:
         mod.bias.data.zero_()
 
 def kaimingn_init(mod):
     if hasattr(mod, 'weight') and mod.weight is not None:
-        nn.init.kaiming_normal_(mod.weight, a=0.1, nonlinearity='leaky_relu')
+        nn.init.kaiming_normal_(mod.weight, a=0.1, nonlinearity=mod.activation if hasattr(mod, 'activation') else 'leaky_relu')
     if hasattr(mod, 'bias') and mod.bias is not None:
         mod.bias.data.zero_()
 
@@ -38,7 +38,7 @@ Torch Modules
 """
 class CausalConvolution1D(nn.Module):
 
-    def __init__(self, in_channels, out_channels, kernel_size = 1, dilation = 0, bias = False, init_type = 'kaiming_n') -> None:
+    def __init__(self, in_channels, out_channels, kernel_size = 1, dilation = 0, bias = False, init_type = 'kaiming_n', activation='leaky_relu') -> None:
         super(CausalConvolution1D, self).__init__()
 
         self.padding = (kernel_size - 1) * dilation
@@ -48,7 +48,8 @@ class CausalConvolution1D(nn.Module):
                                padding = 0, 
                                dilation = dilation, 
                                bias = bias,
-                               init_type = init_type)
+                               init_type = init_type,
+                               activation=activation)
 
     def forward(self, x):
         x = torch.nn.functional.pad(x, (self.padding, 0))
@@ -59,9 +60,10 @@ class Conv1dWrap(nn.Conv1d):
     Simple wrapper that ensures initialization
     Source: https://github.com/hrbigelow/ae-wavenet/blob/master/wavenet.py#L167
     """
-    def __init__(self, init_type = 'xavier_u', **kwargs):
+    def __init__(self, init_type = 'xavier_u', activation='leaky_relu', **kwargs):
         super(Conv1dWrap, self).__init__(**kwargs)
         init_type = init_type
+        self.activation = activation
         if init_type == 'xavier_u':
             self.apply(xavieru_init)
         elif init_type == 'xavier_n':
@@ -114,86 +116,18 @@ class Jitter(nn.Module):
                 new_quantized[:, :, i] = original_quantized[:, :, neighbor_index]
 
         return new_quantized
-
-class ResidualConv1dGLU(nn.Module):
-
-    def __init__(self, residual_channels, gate_channels, kernel_size, skip_out_channels = None, cin_channels = -1, dropout= 1 - 0.95, dilation = 1, bias = False, init_type='kaiming_n'	):
-        super(ResidualConv1dGLU, self).__init__()
-
-#       dilations = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
-
-        self.dil_conv = CausalConvolution1D(residual_channels, 
-                                  gate_channels, 
-                                  kernel_size,
-                                  dilation = dilation,
-                                  bias = bias,
-                                  init_type = init_type)
-
-        self.conv1cond = Conv1dWrap(in_channels = cin_channels, 
-                                   out_channels = gate_channels, 
-                                   kernel_size = 1, 
-                                   padding = 0, 
-                                   dilation = 1, 
-                                   bias = bias,
-                                   init_type = init_type)
-
-        # conv output is split into two groups
-        gate_out_channels = gate_channels // 2
-        self.conv1_out = Conv1dWrap(in_channels=gate_out_channels, 
-                                   out_channels=residual_channels, 
-                                   kernel_size = kernel_size,
-                                   bias=bias, 
-                                   padding = 'same',
-                                   init_type = init_type)
-        
-        self.conv1_skip = Conv1dWrap(in_channels = gate_out_channels, 
-                                    out_channels = skip_out_channels, 
-                                    kernel_size = kernel_size, 
-                                    bias=bias, 
-                                    padding = 'same',
-                                    init_type = init_type)
-        self.splitdim = 1
-        # self.apply(xavier_init)
-
-    def forward(self, x, c):
-        """Forward
-        Args:
-            x (Tensor): B x C x T
-            c (Tensor): B x C x T, Local conditioning features
-        Returns:
-            x (Tensor): B x residual_channels x T
-            s (Tensor): B x skip_channels x T
-        """
-        residual = x
-        condition = self.conv1cond(c)
-
-        x = self.dil_conv(x) # Dilated convolution
-
-        a, b = x.split(x.size(self.splitdim) // 2, dim=self.splitdim) # Get filter and gate
-        ca, cb = condition.split(condition.size(self.splitdim) // 2, dim=self.splitdim) # Get filter and gate from local condition
-        filt, gate = a + ca, b + cb # Combine filters and gates
-
-        x = torch.tanh(filt) * torch.sigmoid(gate)
-
-        # For skip connection
-        s = self.conv1_skip(x)
-
-        # For residual connection
-        x = self.conv1_out(x)
-        x += residual
-        
-        return x, s
     
 class Upsampling(nn.Module):
     """
     Module for upsampling conditional features
     Sourced from: https://github.com/hrbigelow/ae-wavenet/blob/master/wavenet.py#L142
     """
-    def __init__(self, n_chan, filter_sz, stride, bias=True, name=None, init_type='kaiming_n'):
+    def __init__(self, n_chan, filter_sz, stride, bias=True, name=None, init_type='kaiming_n', activation='leaky_relu'):
         super(Upsampling, self).__init__()
         # See upsampling_notes.txt: padding = filter_sz - stride
         # and: left_offset = left_wing_sz - end_padding
         end_padding = stride - 1
+        self.activation = activation
 
         self.tconv = nn.ConvTranspose1d(n_chan, n_chan, filter_sz, stride,
                 padding=filter_sz - stride, bias=bias)

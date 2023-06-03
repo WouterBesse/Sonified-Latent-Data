@@ -5,11 +5,8 @@ import math
 import argparse
 
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
 from models.WaveNetVAE.WaveVae import WaveNetVAE
 from models.WaveNetVAE.WVData import WVDataset
-# from WaveVae import WaveNetVAE
-# from WVData import WVDataset
 import warnings
 from datetime import datetime
 import wandb
@@ -78,11 +75,9 @@ def validate(model, dataloader, kl_mult, loss_fn, device='cuda', verbose = False
     return total_eval_loss[0] / eval_step, total_eval_loss[1] / eval_step, total_eval_loss[2] / eval_step
 
 
-def train(model, dataloader_train, dataloader_val, export_path, learning_rate=0.00001, epoch_amount=100, logs_per_epoch=5, kl_anneal=0.01, max_kl=0.5, device='cuda', verbose = False):
-    print('swag')
-    
+def train(model, dataloader_train, dataloader_val, export_path, learning_rate=0.00001, epoch_amount=100, logs_per_epoch=5, kl_anneal=0.01, max_kl=0.5, device='cuda', verbose = False):    
     loss_fn = torch.nn.CrossEntropyLoss()
-    # loss_fn = torch.nn.MSELoss()
+    torch.backends.cudnn.benchmark = True
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     wandb.watch(model, log="all", log_freq=1)
     logstep = 0
@@ -104,12 +99,12 @@ def train(model, dataloader_train, dataloader_val, export_path, learning_rate=0.
                 snippet = snippet.to(device)
                 mfcc_input = mfcc_input.to(device)
                 # print('snippet size:', snippet[...,:4096].unsqueeze(1).size())
-
-                output, mean, variance = model(snippet[...,:4096].unsqueeze(1), mfcc_input, True, verbose)
-                # print('generated size:', output[..., -1].size(), 'target size: ', snippet[..., -1].size())
-                real_loss, rec_loss, kl_loss = calculate_loss(
-                    output[..., -1], snippet[..., -1].type(torch.LongTensor).to(device), mean, variance, kl_mult, loss_fn)
-                
+                with torch.cuda.amp.autocast():
+                    output, mean, variance = model(snippet[...,:4096].unsqueeze(1), mfcc_input, True, verbose)
+                    # print('generated size:', output[..., -1].size(), 'target size: ', snippet[..., -1].size())
+                    real_loss, rec_loss, kl_loss = calculate_loss(
+                        output[..., -1], snippet[..., -1].type(torch.LongTensor).to(device), mean, variance, kl_mult, loss_fn)
+            
                 real_loss.backward()
                 optimizer.step()
 

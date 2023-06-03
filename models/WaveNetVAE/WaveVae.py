@@ -12,7 +12,7 @@ class Decoder(nn.Module):
     WaveNetVAE Decoder
     """
     def __init__(self, out_channels, upsamples, zsize=128, use_jitter=True,
-                 jitter_probability=0.12, init_type='kaiming_n'):
+                 jitter_probability=0.12, init_type='kaiming_n', activation='leaky_relu'):
         super().__init__()
 
         self.use_jitter = use_jitter
@@ -29,7 +29,8 @@ class Decoder(nn.Module):
                                 out_channels=128,
                                 kernel_size=3,
                                 padding='same',
-                                init_type = init_type)
+                                init_type = init_type,
+                                activation=activation)
 
         self.wavenet = Wavenet(
             layers=10,
@@ -40,9 +41,9 @@ class Decoder(nn.Module):
             gate_channels=768,
             cond_channels=128,
             kernel_size=3,
-            upsample_conditional_features=True,
             upsample_scales=upsamples,
-            init_type = init_type
+            init_type = init_type,
+            activation = activation
         )
 
         self.receptive_field = self.wavenet.receptive_field
@@ -74,12 +75,12 @@ class Encoder(nn.Module):
     WaveNETVAE Encoder
     """
 
-    def __init__(self, input_size, hidden_dim=768, zsize=128, resblocks=2, relublocks=4, init_type = 'kaiming_n'):
+    def __init__(self, input_size, hidden_dim=768, zsize=128, resblocks=2, relublocks=4, init_type = 'kaiming_n', activation='leaky_relu'):
         super().__init__()
 
         features, timesteps = input_size
         self.zsize = zsize
-        self.ReL = nn.LeakyReLU(negative_slope=0.1)
+        self.ReL = nn.LeakyReLU(negative_slope=0.1) if activation == 'leaky_relu' else nn.ReLU()
 
         """
         Preprocessing convolutions with residual connections
@@ -88,13 +89,15 @@ class Encoder(nn.Module):
                                 out_channels=hidden_dim,
                                 kernel_size=3,
                                 padding='same',
-                                init_type = init_type)
+                                init_type = init_type,
+                                activation=activation)
 
         self.conv_2 = WOP.Conv1dWrap(in_channels=features,
                                 out_channels=hidden_dim,
                                 kernel_size=3,
                                 padding='same',
-                                init_type = init_type)
+                                init_type = init_type,
+                                activation=activation)
 
         """
         Downsample in the time axis by a factor of 2
@@ -104,7 +107,8 @@ class Encoder(nn.Module):
                                     kernel_size=4,
                                     stride=2,
                                     padding=1,
-                                    init_type = init_type)
+                                    init_type = init_type,
+                                    activation=activation)
 
         """
         Residual convs
@@ -116,7 +120,8 @@ class Encoder(nn.Module):
                           out_channels=hidden_dim,
                           kernel_size=3,
                           padding='same',
-                          init_type = init_type)
+                          init_type = init_type,
+                          activation=activation)
                           )
 
         """
@@ -130,14 +135,16 @@ class Encoder(nn.Module):
                               out_channels=hidden_dim,
                               kernel_size=3,
                               padding='same',
-                              init_type = init_type),
-                    nn.LeakyReLU(negative_slope=0.1, inplace=True),
+                              init_type = init_type,
+                              activation=activation),
+                    self.ReL,
                     WOP.Conv1dWrap(in_channels=hidden_dim,
                               out_channels=hidden_dim,
                               kernel_size=3,
                               padding='same',
-                              init_type = init_type),
-                    nn.LeakyReLU(negative_slope=0.1, inplace=True)))
+                              init_type = init_type,
+                              activation=activation),
+                    self.ReL))
 
         """
         The linear block from the WaveNet VQVAE paper.
@@ -192,7 +199,7 @@ class WaveNetVAE(nn.Module):
     Full WaveNetVAE model
     """
 
-    def __init__(self, input_size, num_hiddens, upsamples, zsize=32, resblocks=2, out_channels=256, init_type='kaiming_n'):
+    def __init__(self, input_size, num_hiddens, upsamples, zsize=32, resblocks=2, out_channels=256, init_type='kaiming_n', activation='leaky_relu'):
         super(WaveNetVAE, self).__init__()
         
         self.out_channels = out_channels
@@ -202,14 +209,16 @@ class WaveNetVAE(nn.Module):
             hidden_dim=num_hiddens,
             zsize=zsize,
             resblocks=resblocks,
-            init_type = init_type
+            init_type = init_type,
+            activation = activation
         )
 
         self.decoder = Decoder(
             out_channels=out_channels,
             upsamples=upsamples,
             zsize=zsize,
-            init_type = init_type
+            init_type = init_type,
+            activation = activation
         )
 
         self.receptive_field = self.decoder.receptive_field
