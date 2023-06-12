@@ -20,6 +20,9 @@ A lot of earlier experiments relevant to this project I tried using the WaveNet 
 
 <img src="https://github.com/WouterBesse/Sonified-Latent-Data/blob/main/media/WaveNetVae.jpg?raw=true" align="right" width="430px" alt="WaveNet VAE Diagram" />
 
+Here's how it sounds so far. It's very noisy, but it's definitely trying to make some patterns of speech.
+<audio src="[audio.mp3](https://github.com/WouterBesse/Sonified-Latent-Data/blob/main/media/FirstResult.wav)" controls preload></audio>
+
 This model is very similar to the one described by [Chorowski et al.](https://arxiv.org/abs/1901.08810) and follows the following model:
 I decided to go with a normal VAE and not the quantized variant because it allows me to more easily interpolate and play with the latent space.
 
